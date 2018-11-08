@@ -9,7 +9,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-.incsrc Defines.asm				;load all defines for RAM addresses
+.incsrc Defines.asm					;load all defines for RAM addresses
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -95,15 +95,15 @@ CODE_C04F:
    LDA #$00						;
    STA $20						;
    
-   LDA $30						;
-   BEQ CODE_C05D					;
+   LDA $30						;if in actual gameplay (not title screen or demo recording)
+   BEQ CODE_C05D					;always play sound effects
    
-   LDA $50						;
+   LDA $50						;if not in title screen mode (demo recording, titlescreen/gameplay inits), don't play sounds
    CMP #$01						;
    BNE CODE_C060					;
    
 CODE_C05D:
-   JSR CODE_F8A7
+   JSR CODE_F8A7					;
    
 CODE_C060:
    JSR CODE_CD88
@@ -9468,7 +9468,7 @@ CODE_FA8E:
    JMP CODE_FA1E
    
 CODE_FA91:
-   LDA $FA					;it looks like I'll be figuring wacko codes like this forever
+   LDA $FA					;seems to be related with sound effect/music playing (sound engine)
    BNE CODE_FAD1				;I hope it's easier than it looks
    LDY $FF					;
    LDA $F0					;If value in $F0
@@ -9506,7 +9506,7 @@ CODE_FA91:
    BCS CODE_FB0F				;
    
 CODE_FAD1:
-   JMP CODE_FCC9				;if non of the checks above are true, jump out of this hell
+   JMP CODE_FCC9				;if there's no sound to play... more checkes
    
 CODE_FAD4:
    LDX #$11
