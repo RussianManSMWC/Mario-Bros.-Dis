@@ -15,13 +15,13 @@
 
    .db "NES", $1A
    
-   .db $01							;16KB PRG space (for code) = 1
-   .db $01							;8KB CHR space (for GFX) = 1
-   .db $01							;It's supposed to mirror vertically, though sometimes PPU viewer shows tilemap being mirrored horizontally in my emulator. But who cares? It doesn't affect game at all.
-   .db $00							;Mapper 0 - NROM
+   .db $01						;16KB PRG space (for code) = 1
+   .db $01						;8KB CHR space (for GFX) = 1
+   .db $01						;It's supposed to mirror vertically, though sometimes PPU viewer shows tilemap being mirrored horizontally in my emulator. But who cares? It doesn't affect game at all.
+   .db $00						;Mapper 0 - NROM
    
-   .db $00,$00,$00,$00				;bytes that don't do anything
-   .db $00,$00,$00,$00				;
+   .db $00,$00,$00,$00					;bytes that don't do anything
+   .db $00,$00,$00,$00					;
    
    .org $C000						;starting point = $C000
 
@@ -33,73 +33,73 @@
 
 
 RESET:
-   CLD								;Disable Decimal Mode
-   SEI								;
+   CLD							;Disable Decimal Mode
+   SEI							;
    
 vblankloop:
    LDA $2002						;V-blank loop 1 to waste some cycles
    BPL vblankloop					;required to enable other PPU registers
 
-   LDX #$00							;
+   LDX #$00						;
    STX $2000						;
    STX $2001						;
-   DEX								;
-   TXS								;
+   DEX							;
+   TXS							;
    
-   LDX $70							;why this is needed?
+   LDX $70						;why this is needed?
    
-   LDY #$06							;set up RAM clearing loop
-   STY $01							;
+   LDY #$06						;set up RAM clearing loop
+   STY $01						;
    
-   LDY #$00							;
-   STY $00							;clear ~$600 bytes
+   LDY #$00						;
+   STY $00						;clear ~$600 bytes
    
-   LDA #$00							;all those bytes should contain 0
+   LDA #$00						;reset all those bytes
    
 ResetLoop:
    STA ($00),y						;
    
-   DEY								;
+   DEY							;
    BNE ResetLoop					;
    
-   DEC $01							;
+   DEC $01						;
    BPL ResetLoop					;we set reset loop by setting high and low bytes for inderect adressing, and decrease high byte
    
-   TXA								;I still have no idea
+   TXA							;I still have no idea
    BNE CODE_C02B					;
-   LDX #$5F							;
+   LDX #$5F						;
 
 CODE_C02B:
    STX $0500						;
    JSR CODE_CA1B					;clear screen(s)
    JSR CODE_CA2B					;"clear" sprite data
    
-   LDY #$00							;load 00 into Y register....
+   LDY #$00						;load 00 into Y register....
    STA $2005						;\write to OAM
    STA $2005						;/twice
 
-   INY								;\increase Y register...
-   STY $30							;/store to $30. why not just LDY #$01? using LDY #$01 doesn't seem to break anything...
+   INY							;\increase Y register...
+   STY $30						;/store to $30. why not just LDY #$01? using LDY #$01 doesn't seem to break anything...
    
-   LDA #$0F							;\enable all sound channels (except for DMC)
+   LDA #$0F						;\enable all sound channels (except for DMC)
    STA $4015						;/
    
-   LDA #$90							;enable VBlank (NMI) and background
+   LDA #$90						;enable VBlank (NMI) and background
    STA $2000						;
-   STA $09							;backup enabled bits
+   STA $09						;backup enabled bits
    
-   LDA #$06							;
-   STA $0A							;
+   LDA #$06						;
+   STA $0A						;
 
 CODE_C04F:   
-   LDA #$00							;
-   STA $20							;
+   LDA #$00						;
+   STA $20						;
    
-   LDA $30							;
+   LDA $30						;
    BEQ CODE_C05D					;
    
-   LDA $50							;
-   CMP #$01							;
+   LDA $50						;
+   CMP #$01						;
    BNE CODE_C060					;
    
 CODE_C05D:
@@ -109,14 +109,14 @@ CODE_C060:
    JSR CODE_CD88
    JSR CODE_C4B8
 
-   LDA #$01							;this enables graphics display?
-   STA $22							;
+   LDA #$01						;this enables graphics display?
+   STA $22						;
 
 CODE_C06A:
    LDA $20
    BEQ CODE_C077
 
-   INC $2F							;is this frame counter? we'll see, we'll see...
+   INC $2F						;is this frame counter? we'll see, we'll see...
    
    LDA #$00
    STA $22
@@ -127,37 +127,37 @@ CODE_C077:
    JMP CODE_C06A
 
 NMI:
-   PHA								;\usual stuff - save all registers
-   TXA								;|
-   PHA								;|
-   TYA								;|
-   PHA								;/because interrupt can, well, interrupt any process anytime, so we want to make sure we don't mess any registers we had
+   PHA							;\usual stuff - save all registers
+   TXA							;|
+   PHA							;|
+   TYA							;|
+   PHA							;/because interrupt can, well, interrupt any process anytime, so we want to make sure we don't mess any registers we had
    
-   LDA #$00							;\OAM DMA
+   LDA #$00						;\OAM DMA
    STA $2003						;|
-   LDA #$02							;|
+   LDA #$02						;|
    STA $4014						;/
    
-   LDA $22							;some flag that skips some routines
+   LDA $22						;some flag that skips some routines
    BEQ CODE_C0AC					;
    
    JSR CODE_CB58					;some important routines, probably to keep Graphics on screen and etc.
    JSR CODE_EE6A					;
-   JSR CODE_CCFF            		;   
-   JSR CODE_CA66            		;   
-   JSR CODE_CE09            		;   
-   JSR CODE_CCC5            		;   
-   JSR CODE_CAF7    				;
+   JSR CODE_CCFF            				;   
+   JSR CODE_CA66            				;   
+   JSR CODE_CE09            				;   
+   JSR CODE_CCC5            				;   
+   JSR CODE_CAF7    					;
 
-   LDY #$01							;set some flag. 
-   STY $20							;
+   LDY #$01						;set some flag. 
+   STY $20						;
    
    DEY
    STY $42
 
 CODE_C0AC:   
    LDA #$01						;"Was interrupted" flag, required to exit loop waiting for interrupt to happen
-   STA InterruptedFlag			;
+   STA InterruptedFlag					;
 
    PLA							;\restore all registers
    TAY							;|
@@ -257,9 +257,9 @@ CODE_C130:
    BCC CODE_C155
    
 CODE_C13E:
-   LDA $0334				;
+   LDA $0334					;
    CMP $C4					;
-   BEQ CODE_C164			;
+   BEQ CODE_C164				;
    BCS CODE_C155
    BCC CODE_C158
    
@@ -912,7 +912,7 @@ CODE_C4AE:
    RTS
    
 CODE_C4B8:
-   LDA $30						;
+   LDA $30					;
    BNE CODE_C528				;
    
    LDA $18
@@ -989,9 +989,9 @@ DATA_C510:
    .dw CODE_D3A8
    
    .dw CODE_C5A3
-   .dw CODE_D5E5			;return
+   .dw CODE_D5E5				;return
    .dw CODE_E453
-   .dw CODE_D5E5			;return
+   .dw CODE_D5E5				;return
    
    .dw CODE_D451
    .dw CODE_E129
@@ -1078,20 +1078,20 @@ CODE_C57E:
    STA $0200
  
 CODE_C58E:   
-   LDA $50  						;\Set up pointers based on $50 value                
-   JSR CODE_CD9E					;/
+   LDA $50  					;\Set up pointers based on $50 value                
+   JSR CODE_CD9E				;/
 
 DATA_C593:
-   .dw CODE_D40B					;loading title screen
-   .dw CODE_D47D					;title screen
-   .dw CODE_D491					;initialize gameplay
-   .dw CODE_D496					;preparing gameplay area
-   .dw CODE_D49B					;same as before?
-   .dw CODE_D4A0					;enable screen display
-   .dw CODE_D4AF					;playing title screen demo recording
-   .dw CODE_D448					;reset pointer
+   .dw CODE_D40B				;loading title screen
+   .dw CODE_D47D				;title screen
+   .dw CODE_D491				;initialize gameplay
+   .dw CODE_D496				;preparing gameplay area
+   .dw CODE_D49B				;same as before?
+   .dw CODE_D4A0				;enable screen display
+   .dw CODE_D4AF				;playing title screen demo recording (or actual gameplay?)
+   .dw CODE_D448				;reset pointer
    
-CODE_C5A3:						;seems to handle all things during gameplay
+CODE_C5A3:					;seems to handle all things during normal gameplay
    JSR CODE_D56E             
    JSR CODE_D202
    JSR CODE_D301                
@@ -1172,8 +1172,8 @@ CODE_C62C:
    JSR CODE_DFBA 
    JMP CODE_C657
   
-   LDA $51						;unused? leftover?
-   BNE CODE_C62C				;it can't be executed
+   LDA $51					;unused? leftover?
+   BNE CODE_C62C				;these can't be executed
 
 CODE_C636:  
    LDA $33                  
@@ -1857,7 +1857,7 @@ CODE_C9BD:
    STA $C1
    
    LDA #$00      				;huh? They couldn't use one LDA #$00 for both C1 and B4?           
-   STA $B4						;
+   STA $B4					;
    
 CODE_C9CB:
    LDA $B8                  
@@ -1933,7 +1933,7 @@ CODE_CA18:
    
 CODE_CA1B:
    LDA #$03				;
-   JSR CODE_CA22		;
+   JSR CODE_CA22			;
 
 CODE_CA20:
    LDA #$01				;
@@ -1943,7 +1943,7 @@ CODE_CA22:
    
    LDA #$24				;set blank tile to be displayed on screen
    STA $00				;
-   JMP CODE_CD43		;go and clean screen
+   JMP CODE_CD43			;go and clean screen
    
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Clear Sprites loop
@@ -1958,12 +1958,12 @@ CODE_CA2B:				;
    LDY #$00				;\OAM starting point, low byte
    STY $00				;/
    
-   LDA #$F4				;use dummy tile F4, which looks like one of 8x8 tiles for big fireball (unused)
+   LDA #$F4				;use dummy tile F4, which looks like one of 8x8 tiles for 16x16 fireball (unused)
    
 CODE_CA35:
-   STA ($00),y			;
+   STA ($00),y				;
    DEY					;
-   BNE CODE_CA35		;loop
+   BNE CODE_CA35			;loop
    RTS					;
 
 CODE_CA3B:
@@ -2533,10 +2533,10 @@ CODE_CCFF:
    LDA #$05
    STA $01
    
-   LDA $09					; 
-   AND #$FB					;
+   LDA $09				; 
+   AND #$FB				;
    STA $2000				;enable any of bits except for bits 0 and 1
-   STA $09					;back them up
+   STA $09				;back them up
    
    LDX $2002
    
@@ -2592,73 +2592,73 @@ CODE_CD42:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
    
 CODE_CD43:
-   LDA $2002					;ready to draw
+   LDA $2002				;ready to draw
    
-   LDA $09						;\
-   AND #$FB						;|
-   STA $2000					;|
-   STA $09						;/
+   LDA $09				;\
+   AND #$FB				;|
+   STA $2000				;|
+   STA $09				;/
    
-   LDA #$1C						;
-   CLC							;
+   LDA #$1C				;
+   CLC					;
    
 CODE_CD52:
-   ADC #$04						;
-   DEC $01						;calculate high byte of tile drawing starting point
-   BNE CODE_CD52				;can be either 20 or 28
-   STA $02						;
-   STA $2006					;
+   ADC #$04				;
+   DEC $01				;calculate high byte of tile drawing starting point
+   BNE CODE_CD52			;can be either 20 or 28
+   STA $02				;
+   STA $2006				;
    
-   LDA #$00						;tile drawing's position, low byte
-   STA $2006					;so, the final starting position is either 2000 or 2800
+   LDA #$00				;tile drawing's position, low byte
+   STA $2006				;so, the final starting position is either 2000 or 2800
    
-   LDX #$04						;to effectively clear full screen, we need to go from 0 to 255 (dec) 4 times! which is 8 horizontal tile lines from the top right to the bottom left tile. that's how many 8x8 tiles to clear
-   LDY #$00						;(technically not, as this also affects attributes that start after 2xBF, but they get cleared afterwards anyway)
+   LDX #$04				;to effectively clear full screen, we need to go from 0 to 255 (dec) 4 times! which is 8 horizontal tile lines from the top right to the bottom left tile. that's how many 8x8 tiles to clear
+   LDY #$00				;(technically not, as this also affects attributes that start after 2xBF, but they get cleared afterwards anyway)
    
-   LDA $00						;load tile to fill screen with (by default it's only 24. why they didn't load 24 directly is a mystery. They wanted to use this more than once, with different values loaded into $00? world may never know).
+   LDA $00				;load tile to fill screen with (by default it's only 24. why they didn't load 24 directly is a mystery. They wanted to use this more than once, with different values loaded into $00? world may never know).
    
 CODE_CD68:
-   STA $2007					;\fill screen(s) with tiles
-   DEY							;|
-   BNE CODE_CD68				;|
-   DEX							;|
-   BNE CODE_CD68				;/
+   STA $2007				;\fill screen(s) with tiles
+   DEY					;|
+   BNE CODE_CD68			;|
+   DEX					;|
+   BNE CODE_CD68			;/
    
-   LDA $02						;\calculate position of tile attribute data.
-   ADC #$03						;|end result is either 23 or 2B
-   STA $2006					;/
+   LDA $02				;\calculate position of tile attribute data.
+   ADC #$03				;|end result is either 23 or 2B
+   STA $2006				;/
    
-   LDA #$C0						;\attributes location, low byte
-   STA $2006					;/
+   LDA #$C0				;\attributes location, low byte
+   STA $2006				;/
    
-   LDY #$40						;64 attribute bytes
-   LDA #$00						;zero 'em out
-   
+   LDY #$40				;64 attribute bytes
+   LDA #$00				;zero 'em out
+ 
 CODE_CD81:
-   STA $2007					;\this loop clears tile attributes (y'know, 32x32 areas that contain palette data for each individual 16x16 in it tile)
-   DEY							;|
-   BNE CODE_CD81				;/
-   RTS							;
+   STA $2007				;\this loop clears tile attributes (y'know, 32x32 areas that contain palette data for each individual 16x16 in it tile)
+   DEY					;|
+   BNE CODE_CD81			;/
+   RTS					;
    
 CODE_CD88:
-   LDX #$01						;Unknown
-   DEC $2A						;
-   BPL CODE_CD94				;
+   LDX #$01				;Unknown (yet)
+   DEC $2A				;
+   BPL CODE_CD94			;
    
-   LDA #$0A						;
-   STA $2A						;
+   LDA #$0A				;
+   STA $2A				;
    
-   LDX #$03						;
+   LDX #$03				;
    
 CODE_CD94:
-   LDA $2B,x					;
-   BEQ CODE_CD9A				;
-   DEC $2B,x					;
+   LDA $2B,x				;
+   BEQ CODE_CD9A			;
+   DEC $2B,x				;
    
 CODE_CD9A:
-   DEX							;
-   BPL CODE_CD94				;
-   RTS							;
+   DEX					;
+   BPL CODE_CD94			;
+   RTS					;
    
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Pointer routine
@@ -2667,21 +2667,21 @@ CODE_CD9A:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 CODE_CD9E:
-   ASL A                    
-   TAY                      
-   INY                      
-   PLA                      
-   STA $14                  
-   PLA                      
-   STA $15 
+   ASL A				;loaded value multiply by 2
+   TAY                      		;turn into y
+   INY                      		;and add 1 (to jump over jsr's bytes and load table values correctly)
+   PLA                      		;pull our previous location that JSR pushed for us
+   STA $14                  		;low byte
+   PLA                      		;
+   STA $15 				;high byte
    
-   LDA ($14),Y              
-   TAX                      
-   INY                      
-   LDA ($14),Y              
-   STA $15                  
-   STX $14                  
-   JMP ($0014)              
+   LDA ($14),Y              		;load new location from the table, low byte
+   TAX                      		;turn it into x
+   INY                      		;increase Y for high byte
+   LDA ($14),Y              		;get it
+   STA $15                  		;and store
+   STX $14                  		;low byte stored into x goes here
+   JMP ($0014)              		;perform jump to set location
    
 CODE_CDB4:
    PHA
@@ -2697,14 +2697,14 @@ CODE_CDB4:
    RTS
    
 CODE_CDC4:				;this code writes MARIO BROS. logo and stuff
-   STA $2006			;load locations for tile to draw
+   STA $2006				;load locations for tile to draw
    INY					;
 
-   LDA ($00),y			;low byte
-   STA $2006			;
+   LDA ($00),y				;low byte
+   STA $2006				;
    INY					;
 
-   LDA ($00),y			;
+   LDA ($00),y				;
    ASL A				;
    PHA					;
    LDA $09
@@ -3222,7 +3222,7 @@ CODE_D03F:
    TXA
    SEC                      
    ADC $01                  
-   JSR CODE_CE86				;to be continued
+   JSR CODE_CE86
    
    TAX                      
    STX $0590
@@ -3334,8 +3334,8 @@ CODE_D0E8:
    JSR CODE_D15A                
    STA $95,X
    
-   LDA $95,X              ;\could work without LDA?
-   BNE CODE_D116          ;/
+   LDA $95,X             		 ;\could work without LDA?
+   BNE CODE_D116         		 ;/
    
    LDA $96,X                
    BNE CODE_D116                
@@ -3781,87 +3781,87 @@ CODE_D33A:
    LDA $0500
    RTS
    
-CODE_D34A:					;probably gameplay init
-   LDA $2D					;some flag for init? timer?
+CODE_D34A:				;probably gameplay init
+   LDA $2D				;some flag for init? timer?
    BNE CODE_D3A7			;
    
-   LDA #$00					;
-   STA $31					;
-   STA $41					;reset number display
+   LDA #$00				;
+   STA $31				;
+   STA $41				;reset number display
    
-   LDA #$03					;
-   STA $70					;initialize POW's hitpoints
+   LDA #$03				;
+   STA $70				;initialize POW's hitpoints
    
-   LDX #$02					;
-   LDY #$00					;
-   STX $48					;set first player's lifes
-   STY $4A					;reset gameover flag
-   STY $AD					;
+   LDX #$02				;
+   LDY #$00				;
+   STX $48				;set first player's lifes
+   STY $4A				;reset gameover flag
+   STY $AD				;
    
-   LDA $30					;check if it's a demo movie (?)
+   LDA $30				;check if it's a demo movie (?)
    BEQ CODE_D36D			;if not, welp
    
-   LDA #$55					;timer?
-   STA $31					;
+   LDA #$55				;timer?
+   STA $31				;
    JMP CODE_D37D			;demo always has 2 players
    
 CODE_D36D:
-   LDA $29					;if game mode is 2 Players mode
-   CMP #$02					;
+   LDA $29				;if game mode is 2 Players mode
+   CMP #$02				;
    BCS CODE_D37D			;set lives for second player as well
    
-   STY $4C					;otherwise don't display luigi's lifes
-   STY $9E					;and his score
+   STY $4C				;otherwise don't display luigi's lifes
+   STY $9E				;and his score
    
-   LDY #$FF					;
-   LDA #$00					;
+   LDY #$FF				;
+   LDA #$00				;
    BEQ CODE_D381			;
    
 CODE_D37D:
-   STX $4C					;luigi's lifes
+   STX $4C				;luigi's lifes
    
-   LDA #$02					;
+   LDA #$02				;
    
 CODE_D381:
-   STY $4E					;either disable or enable 2nd player sprite
-   STY $AE					;?
-   STA $39					;disable or enable second player's score display (not sure how it works)
+   STY $4E				;either disable or enable 2nd player sprite
+   STY $AE				;?
+   STA $39				;disable or enable second player's score display (not sure how it works)
    
-   LDA #$00					;reset gameover flag for both mario and luigi
-   STA $49					;
-   STA $4D					;
+   LDA #$00				;reset gameover flag for both mario and luigi
+   STA $49				;
+   STA $4D				;
    
    LDX #$07
 
 CODE_D38F:
    STA $94,x				;this loop clears mario and luigi's scores
-   DEX						;
+   DEX					;
    BPL CODE_D38F			;
    
-   LDY #$00					;
-   LDA $29					;check game mode
+   LDY #$00				;
+   LDA $29				;check game mode
    BEQ CODE_D39F			;if it's 1 player game B
-   CMP #$02					;
+   CMP #$02				;
    BEQ CODE_D39F			;or 2 players game B
-   INY						;set flag for game B
+   INY					;set flag for game B
    
 CODE_D39F:
-   STY $3A					;otherwise it'll assume that it's game A
+   STY $3A				;otherwise it'll assume that it's game A
    
-   LDA #$01					;
-   STA $3F					;
-   INC $40					;change game state
+   LDA #$01				;
+   STA $3F				;
+   INC $40				;change game state
 
 CODE_D3A7:
-   RTS						;
+   RTS					;
    
 CODE_D3A8:
    LDA $2D                  
    BNE CODE_D3A7
    
-   LDA #$00                 ;reset lotta flags 'n values
-   STA $49                  ;mario's gameover flag
-   STA $4D                  ;luigi's gameover flag
+   LDA #$00                 		;reset lotta flags 'n values
+   STA $49                  		;mario's gameover flag
+   STA $4D                  		;luigi's gameover flag
    STA $51                  
    STA $46                  
    STA $05FB                
@@ -3909,21 +3909,21 @@ CODE_D3EA:
    STA $2D
    
 CODE_D3F5:
-   INC $40						;next game state
+   INC $40				;next game state
    BNE CODE_D3EA
    
 CODE_D3F9:
-   JSR CODE_E132        			;call NMI and enable rendering (probably (it doesn't actually))       
+   JSR CODE_E132        		;call NMI and enable rendering (probably (it doesn't actually))       
    JSR CODE_CA20                
    JSR CODE_CA2B                
    JSR CODE_D508                
    JSR CODE_D61D
    
-   INC $40  						;next game state?                
-   RTS               				;       
+   INC $40  				;next game state?                
+   RTS               			;       
    
 CODE_D40B:
-   JSR CODE_E132 					;    
+   JSR CODE_E132 			;    
    JSR CODE_CA20            		;   
    JSR CODE_CA2B
    
@@ -4286,15 +4286,15 @@ CODE_D5D5:
 
 CODE_D5DC:
    LDA #$00                 		;reset wait flag
-   STA InterruptedFlag              ;
-   NOP								;and a single NOP for some reason
+   STA InterruptedFlag             	;
+   NOP					;and a single NOP for some reason
    
 CODE_D5E1:
-   LDA InterruptedFlag              ;wait for NMI to happen
-   BEQ CODE_D5E1					;
+   LDA InterruptedFlag              	;wait for NMI to happen
+   BEQ CODE_D5E1			;
 
 CODE_D5E5:
-   RTS								;
+   RTS					;
    
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
    
@@ -4316,10 +4316,10 @@ CODE_D5F0:
    STA $1E
    
    LDA #$20                 
-   INX          			;what?
+   INX
 
 CODE_D5FB:   
-   DEX                      ;
+   DEX                      		;
    BEQ CODE_D60A
    
 CODE_D5FE:
@@ -5598,7 +5598,7 @@ CODE_DCBC:
    JMP CODE_E9B8				;
   
 CODE_DCBF:  
-   JMP CODE_E9B8              	;wait a sec, 2 indentical JMPs???
+   JMP CODE_E9B8              			;wait a sec, 2 indentical JMPs???
   
 CODE_DCC2:
    LDY #$10                 
@@ -5775,7 +5775,7 @@ CODE_DD9A:
    JMP CODE_DDB6
 
 DATA_DDB0:
-.db $08,$16,$24,$32			;last byte may be unused
+.db $08,$16,$24,$32				;
 
    LDA #$08					;unused?
 
@@ -5944,7 +5944,7 @@ CODE_DE83:
    LDX #$00                 
    STX $04
    
-   LDX #$00            ;The hell???  you guys can't use one LDX #$00 for everything?   
+   LDX #$00           				 ;The hell???  you guys can't use one LDX #$00 for everything?   
    STX $05                  
    STX $06                  
    STX $07
@@ -6283,7 +6283,7 @@ CODE_E03C:
 
    
 CODE_E044:
-   LDA #$FF                 ;again, shouldn't FF be in A already?
+   LDA #$FF                		 ;
    STA $04F0
    
    LDA #$89                 
@@ -6376,11 +6376,11 @@ CODE_E131:
    RTS                      
    
 CODE_E132:
-   JSR CODE_D5DC		;
+   JSR CODE_D5DC			;
 
    LDA $0A				;
    AND #$E7				;
-   STA $2001			;only show sprites and/or foreground.
+   STA $2001				;only show sprites and/or foreground.
    RTS
    
 CODE_E13D:
@@ -7156,7 +7156,7 @@ CODE_E554:
   LDY #$E5                 
   BNE CODE_E530                
   
-DATA_E568:							;unused data?
+DATA_E568:				;unused data?
 .db $15,$16,$0A,$1B,$12,$18
 .db $15,$15,$1E,$12,$10,$12
    
@@ -7201,51 +7201,51 @@ CODE_E5F3:
    SEC                      
    SBC #$05
 
-CODE_E5F6:					;related with coin sprites, for "test your skill" bonus?
-   STY $1E					;
+CODE_E5F6:				;related with coin sprites, for "test your skill" bonus?
+   STY $1E				;
 
-   ASL A                    ;
-   ASL A                    ;
-   STA $1F					;
+   ASL A                   		;
+   ASL A                    		;
+   STA $1F				;
    
-   ASL A                    ;
-   CLC                      ;
-   ADC $1F                  ;
-   ADC #$70                 ;
-   STA $0233,X              ;
+   ASL A                  		;
+   CLC                      		;
+   ADC $1F                  		;
+   ADC #$70                 		;
+   STA $0233,X              		;
    STA $0237,X				;Tile's X position
    
-   LDA #$02                 ;tile property (sprite palette 2)
-   STA $0232,X              ;
+   LDA #$02                 		;tile property (sprite palette 2)
+   STA $0232,X              		;
    STA $0236,X 				;
    
-   LDA #$A5					;coin's top tile		  
+   LDA #$A5				;coin's top tile		  
    STA $0231,X 				;
    
    LDA #$A6       			;          
    STA $0235,X				;bottom tile
    
-   LDA $1E            		;      
-   STA $0230,X              ;Tile's Y position
-   CLC                      ;
-   ADC #$08                 ;bottom tile 8 pixels lower
+   LDA $1E            			;      
+   STA $0230,X             		;Tile's Y position
+   CLC                     		;
+   ADC #$08                 		;bottom tile 8 pixels lower
    STA $0234,X				;
    
    INC $04BB				;
    
-   LDA #$0A                 ;
-   STA $2B					;
+   LDA #$0A                 		;
+   STA $2B				;
    
-   LDA #$20              	;   
-   STA $FD                  ;
-   RTS                      ;
+   LDA #$20              		;   
+   STA $FD                  		;
+   RTS                      		;
    
 CODE_E631:
    INC $04BA				;
    
-   LDA #$10                 ;
-   STA $2B                  ;
-   RTS                      ;
+   LDA #$10                		;
+   STA $2B                 		;
+   RTS                      		;
    
 CODE_E639:
    LDA #$00                 
@@ -8361,7 +8361,7 @@ CODE_ECEC:
 CODE_ECF2:
    JMP CODE_C6BF
    
-   JSR CODE_DFBD      			;those are never referred to.          
+   JSR CODE_DFBD      				;those are never referred to.          
    JMP CODE_C75A				;RIP?
   
 CODE_ECFB:
@@ -8427,7 +8427,7 @@ CODE_ED50:
    
    LDA #$01                 
    STX $04CC                
-   TYA							;what was point of LDA #$01 then???       
+   TYA						;what was point of LDA #$01 then???       
    STA $04C6
    
    LDA #$00                 
@@ -9133,8 +9133,8 @@ DATA_F854:
 .db $81,$40,$00,$18,$02,$10,$82,$40
 .db $00,$40,$01,$60,$00,$50,$01,$FF    
 
-DATA_F87C:            			;a bunch of FFs. It's possible there was some coding/routine before that they've removed. 
-.db $FF,$FF,$FF         		;or it's just some random freespace, IDK
+DATA_F87C:            				;a bunch of FFs. It's possible there was some coding/routine before that they've removed. 
+.db $FF,$FF,$FF         			;or it's just some random freespace, IDK
 .db $FF,$FF,$FF
 .db $FF,$FF,$FF         
 .db $FF,$FF,$FF        
@@ -9150,23 +9150,23 @@ DATA_F87C:            			;a bunch of FFs. It's possible there was some coding/ro
 .db $FF,$FF,$FF,$FF       
    
 CODE_F8A7:
-   NOP							;\and a bunch of NOPs that are here just because...?
-   NOP							;|
-   NOP							;|
-   NOP							;|
-   NOP							;|
-   NOP							;|
-   NOP							;/
-   LDA #$C0						;\what this does?
+   NOP						;\and a bunch of NOPs that are here just because...?
+   NOP						;|
+   NOP						;|
+   NOP						;|
+   NOP						;|
+   NOP						;|
+   NOP						;/
+   LDA #$C0					;\what this does?
    STA $4017					;/it enables bits that do nothing.
    JSR CODE_FA91				;
    
-   LDA #$00						;
-   STA $FF						;
-   STA $FE						;
-   STA $FD						;
+   LDA #$00					;
+   STA $FF					;
+   STA $FE					;
+   STA $FD					;
    STA $4011					;
-   RTS							;
+   RTS						;
    
 CODE_F8C2:
    LDX #$90                 
@@ -9468,45 +9468,45 @@ CODE_FA8E:
    JMP CODE_FA1E
    
 CODE_FA91:
-   LDA $FA							;it looks like I'll be figuring wacko codes like this forever
-   BNE CODE_FAD1					;I hope it's easier than it looks
-   LDY $FF							;
-   LDA $F0							;If value in $F0
-   LSR A							;/2
-   BCS CODE_FA8B					;if it caused bits to shift onto carry flag, branch
-   LSR $FF							;Divide FF by 2
-   BCS CODE_FA88					;did it caused set carry flag? branch if some
-   LSR A							;I hope you get the idea
-   BCS CODE_FA2D					;
-   LSR $FF							;
-   BCS CODE_FA8E					;
-   LSR A							;
-   BCS CODE_FA44					;
-   LSR $FF							;
-   BCS CODE_FA3B					;
-   LSR $FF							;
-   BCS CODE_FA54					;
-   LSR A							;
-   BCS CODE_FA5F					;
-   LSR A							;
-   BCS CODE_FA71					;
-   LSR $FF							;
-   BCS CODE_FA66					;
-   LSR A							;
-   BCS CODE_FADB					;
-   LSR $FF							;
-   BCS CODE_FAD4					;
-   LSR A							;
-   BCS CODE_FAFF					;
-   LSR $FF							;
-   BCS CODE_FAF8					;
-   LSR A							;
-   BCS CODE_FB24					;
-   LSR $FF							;
-   BCS CODE_FB0F					;
+   LDA $FA					;it looks like I'll be figuring wacko codes like this forever
+   BNE CODE_FAD1				;I hope it's easier than it looks
+   LDY $FF					;
+   LDA $F0					;If value in $F0
+   LSR A					;/2
+   BCS CODE_FA8B				;if it caused bits to shift onto carry flag, branch
+   LSR $FF					;Divide FF by 2
+   BCS CODE_FA88				;did it caused set carry flag? branch if some
+   LSR A					;I hope you get the idea
+   BCS CODE_FA2D				;
+   LSR $FF					;
+   BCS CODE_FA8E				;
+   LSR A					;
+   BCS CODE_FA44				;
+   LSR $FF					;
+   BCS CODE_FA3B				;
+   LSR $FF					;
+   BCS CODE_FA54				;
+   LSR A					;
+   BCS CODE_FA5F				;
+   LSR A					;
+   BCS CODE_FA71				;
+   LSR $FF					;
+   BCS CODE_FA66				;
+   LSR A					;
+   BCS CODE_FADB				;
+   LSR $FF					;
+   BCS CODE_FAD4				;
+   LSR A					;
+   BCS CODE_FAFF				;
+   LSR $FF					;
+   BCS CODE_FAF8				;
+   LSR A					;
+   BCS CODE_FB24				;
+   LSR $FF					;
+   BCS CODE_FB0F				;
    
 CODE_FAD1:
-   JMP CODE_FCC9					;if non of the checks above are true, jump out of this hell
+   JMP CODE_FCC9				;if non of the checks above are true, jump out of this hell
    
 CODE_FAD4:
    LDX #$11
@@ -10199,7 +10199,7 @@ DATA_FEC5:
 .db $44,$40,$44,$44,$84,$84,$84,$84
 .db $84,$44,$44,$44,$05
 
-   .org $FFFA							;Interrupt vectors at set location
+   .org $FFFA						;Interrupt vectors at set location
 
    .dw NMI
    .dw RESET
