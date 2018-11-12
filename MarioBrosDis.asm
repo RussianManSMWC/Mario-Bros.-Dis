@@ -147,13 +147,13 @@ NMI:
    JSR CODE_CA66            				;   
    JSR CODE_CE09            				;   
    JSR CODE_CCC5            				;   
-   JSR CODE_CAF7    					;
+   JSR CODE_CAF7    					;seems to handle player's collision and enemy movement
 
    LDY #$01						;set some flag. 
    STY $20						;
    
-   DEY
-   STY $42
+   DEY							;
+   STY $42						;
 
 CODE_C0AC:   
    LDA #$01						;"Was interrupted" flag, required to exit loop waiting for interrupt to happen
@@ -975,28 +975,24 @@ CODE_C507:
    STA $26
    
 CODE_C50B:
-   LDA $40
-   JSR CODE_CD9E
+   LDA $40					;another gamemode pointer? this time for actual gameplay
+   JSR CODE_CD9E				;
    
 DATA_C510:
-   ;.db $4A,$D3,$4A,$E1,$F9,$D3,$A8,$D3
-   ;.db $A3,$C5,$E5,$D5,$53,$E4,$E5,$D5
-   ;.db $51,$D4,$29,$E1,$5C,$D4,$8B,$E2
+   .dw CODE_D34A				;gameplay init
+   .dw CODE_E14A				;determine Phase number and if it's a "Test Your Skill!" Area
+   .dw CODE_D3F9				;more init - sets Game A or B flag and enables gameplay palette flag
+   .dw CODE_D3A8				;actual gameplay
    
-   .dw CODE_D34A
-   .dw CODE_E14A
-   .dw CODE_D3F9
-   .dw CODE_D3A8
-   
-   .dw CODE_C5A3
+   .dw CODE_C5A3				;game pause?
    .dw CODE_D5E5				;return
-   .dw CODE_E453
+   .dw CODE_E453				;coin counting after "Test Your Skill!" phase
    .dw CODE_D5E5				;return
    
-   .dw CODE_D451
-   .dw CODE_E129
-   .dw CODE_D45C
-   .dw CODE_E28B
+   .dw CODE_D451				;phase start
+   .dw CODE_E129				;wait for next phase to begin (after clearing all enemies)
+   .dw CODE_D45C				;unpause
+   .dw CODE_E28B				;game over
 
    
 CODE_C528:
