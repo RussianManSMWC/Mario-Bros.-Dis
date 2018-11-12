@@ -3,13 +3,19 @@
 
 ;RAM Adresses
 
-InterruptedFlag = $23		;Used to determine if game got interrupted with Non-maskable interrupt. one routine specifically waits for NMI and will end waiting after it happens
+InterruptedFlag = $23		    ;Used to determine if game got interrupted with Non-maskable interrupt. one routine specifically waits for NMI and will end waiting after it happens
 
-Show2ndPlayerScore = $39	;flag for player 2 score to display
+Show2ndPlayerScore = $39	  ;flag for player 2 score to display
 
-GameAorBFlag = $3A
+GameAorBFlag = $3A          ;self explanatory, set if player chose game B
 
-DisplayLevelNum = $41		;
+PaletteFlag = $3F           ;If 1, use palette for normal gameplay, otherwise use title screen palette.
+
+GameplayMode = $40          ;used for pointers to handle various gameplay aspects, such as (un)pausing, proceeding to next phase, coin counting after "Test Your Skill!" and other.
+
+DisplayLevelNum = $41		    ;
+
+FreezeFlag = $42            ;POSSIBLY freeze flag, though it doesn't affects player gravity (only collision) and green fireballs. only applied in normal gameplay or demo.
 
 Player1Lives = $48
 
