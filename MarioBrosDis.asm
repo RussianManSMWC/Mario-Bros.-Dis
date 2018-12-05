@@ -92,7 +92,7 @@ CODE_C02B:
    STA $0A						;
 
 CODE_C04F:   
-   LDA #$00						;
+   LDA #$00						;reset frame window flag
    STA $20						;
    
    LDA $30						;if in actual gameplay (not title screen or demo recording)
@@ -109,7 +109,7 @@ CODE_C060:
    JSR CODE_CD88					;
    JSR CODE_C4B8					;
 
-   LDA #$01						;nope...
+   LDA #$01						;
    STA $22						;
 
 CODE_C06A:
@@ -119,7 +119,7 @@ CODE_C06A:
    INC $2F						;increase frame counter, well, every frame (duh)
    
    LDA #$00						;
-   STA $22						;frame doesn't lasts less or more than, well, one frame, so we close frame window
+   STA $22						;"Disables" NMI
    JMP CODE_C04F					;run some routines that update things every frame, like sounds and stuff
    
 CODE_C077:
@@ -138,8 +138,8 @@ NMI:
    LDA #$02						;|
    STA $4014						;/
    
-   LDA $22						;some flag that skips some routines
-   BEQ CODE_C0AC					;
+   LDA $22						;some sort of "update" flag that allows NMI to update things
+   BEQ CODE_C0AC					;although it doesn't do much in practice.
    
    JSR CODE_CB58					;some important routines, probably to keep Graphics on screen and etc.
    JSR CODE_EE6A					;
