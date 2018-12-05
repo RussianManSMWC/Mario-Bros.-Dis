@@ -103,24 +103,24 @@ CODE_C04F:
    BNE CODE_C060					;
    
 CODE_C05D:
-   JSR CODE_F8A7					;
+   JSR CODE_F8A7					;sound engine of some sorts
    
 CODE_C060:
-   JSR CODE_CD88
-   JSR CODE_C4B8
+   JSR CODE_CD88					;
+   JSR CODE_C4B8					;
 
-   LDA #$01						;this enables graphics display?
+   LDA #$01						;nope...
    STA $22						;
 
 CODE_C06A:
-   LDA $20
-   BEQ CODE_C077
+   LDA $20						;if in frame hasn't passed
+   BEQ CODE_C077					;do other things
 
-   INC $2F						;is this frame counter? we'll see, we'll see...
+   INC $2F						;increase frame counter, well, every frame (duh)
    
-   LDA #$00
-   STA $22
-   JMP CODE_C04F					;Game loop.
+   LDA #$00						;
+   STA $22						;frame doesn't lasts less or more than, well, one frame, so we close frame window
+   JMP CODE_C04F					;run some routines that update things every frame, like sounds and stuff
    
 CODE_C077:
    JSR CODE_D328
@@ -149,7 +149,7 @@ NMI:
    JSR CODE_CCC5            				;   
    JSR CODE_CAF7    					;seems to handle player's collision and enemy movement
 
-   LDY #$01						;set some flag. 
+   LDY #$01						;"Frame has passed" flag.
    STY $20						;
    
    DEY							;
