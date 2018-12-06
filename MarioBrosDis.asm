@@ -339,13 +339,13 @@ CODE_C19F:
    CMP #$0B
    BCC CODE_C221
    
-   LDA $B1
-   AND #$03
-   BNE CODE_C212
+   LDA $B1			;
+   AND #$03			;
+   BNE CODE_C212		;
    
-   LDA $10
-   AND #$03
-   BNE CODE_C221
+   LDA $10			;if player 2 while jumping hits player 1 who falls down
+   AND #$03			;
+   BNE CODE_C221		;do something
    
    LDA #$01
    ORA $B1
@@ -366,7 +366,7 @@ CODE_C1CE:
    CMP #$0B
    BCC CODE_C221
    
-   LDA $10
+   LDA $10			;if player 1 while jumping hits player 2 who falls down
    AND #$03
    BNE CODE_C212
    
