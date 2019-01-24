@@ -6960,25 +6960,25 @@ CODE_E448:
    JMP CODE_E3E3
    
 CODE_E453:
-   JSR CODE_E1F7                
-   LDA $04B4                
-   JSR CODE_CD9E                
+   JSR CODE_E1F7		;related with bonus end after either timer runs out or player(s) collect all coins
+   LDA $04B4			;
+   JSR CODE_CD9E		;execute pointers
 
 DATA_E45C:
-.dw CODE_E464
-.dw CODE_E48A
-.dw CODE_E49A
-.dw CODE_E4AA
+.dw CODE_E464			;bonus end init
+.dw CODE_E48A			;give coins
+.dw CODE_E49A			;wait for result
+.dw CODE_E4AA			;bonus/no bonus
 
 CODE_E464:
-   JSR CODE_E132                
-   JSR CODE_CA20                
-   JSR CODE_CA3B                
-   JSR CODE_CA2B                
-   JSR CODE_D5BE                
-   JSR CODE_D60F                
-   JSR CODE_D5E6                
-   JSR CODE_D5EC                
+   JSR CODE_E132		;turn off rendering & wait for NMI to occur
+   JSR CODE_CA20		;clear screen
+   JSR CODE_CA3B		;write stuff 
+   JSR CODE_CA2B		;clear OAM
+   JSR CODE_D5BE		;write score bar 
+   JSR CODE_D60F		;clear OAM...???
+   JSR CODE_D5E6		;TBC
+   JSR CODE_D5EC
    JSR CODE_E13D
    
    LDA #$00                 
@@ -8881,18 +8881,22 @@ DATA_F1E7:
 .db $3F,$00,$14,$0F,$16,$16,$16,$0F
 .db $27,$27,$27,$0F,$30,$2C,$12,$0F
 .db $30,$29,$19,$0F,$35,$35,$35,$00
+
+DATA_F23F:
 .db $23,$C0,$10,$00,$00,$C0,$30,$00
 .db $50,$00,$00,$55,$55,$00,$00,$00
 .db $00,$55,$55,$23,$F0,$10,$F5,$FF
 .db $FF,$FF,$FF,$FF,$FF,$F5,$FF,$FF
 .db $FF,$FF,$FF,$FF,$FF,$FF,$00,$23
 .db $D0,$58,$00,$23,$E8,$08,$50,$00
-.db $00,$00,$00,$00,$00,$50,$00,$23
-.db $D0,$58,$AA,$23,$E8,$08,$5A,$AA
-.db $AA,$00,$00,$AA,$AA,$5A,$00,$23
-.db $D0,$58,$FF,$23,$E8,$08,$5F,$FF
-.db $FF,$00,$00,$FF,$FF,$5F,$00,$A6
-.db $F2,$B9,$F2,$C6,$F2
+.db $00,$00,$00,$00,$00,$50,$00
+
+DATA_F276:
+.db $23,$D0,$58,$AA,$23,$E8,$08,$5A
+.db $AA,$AA,$00,$00,$AA,$AA,$5A,$00
+.db $23,$D0,$58,$FF,$23,$E8,$08,$5F
+.db $FF,$FF,$00,$00,$FF,$FF,$5F,$00
+.db $A6,$F2,$B9,$F2,$C6,$F2
 
 .db $C6,$F2,$D0,$F2,$DA,$F2,$E1,$F2
 .db $E8,$F2,$00,$EF,$F8,$00,$EF,$00
