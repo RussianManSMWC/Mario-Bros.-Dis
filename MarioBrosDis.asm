@@ -4295,57 +4295,59 @@ CODE_D5E5:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
    
 CODE_D5E6:
-   LDX $48
+   LDX Player1Lives			;load number of player 1's lives to display
    
-   LDY #$D0                 
-   BNE CODE_D5F0
+   LDY #$D0				;OAM offset
+   BNE CODE_D5F0			;Always branch
 
 CODE_D5EC:
-   LDX $4C                  
-   LDY #$DC
+   LDX Player2Lives			;load number of player 2's lives to display
+   LDY #$DC				;
 
 CODE_D5F0:   
-   LDA $30
-   BNE CODE_D609
+   LDA DemoFlag				;if it's demo recording, don't show lives
+   BNE CODE_D609			;
    
-   LDA #$03                 
-   STA $1E
-   
-   LDA #$20                 
-   INX
+   LDA #$03				;can only display max 3 lives for each player
+   STA $1E				;
+
+   LDA #$20				;Y-position onscreen
+   INX					;
 
 CODE_D5FB:   
-   DEX                      		;
-   BEQ CODE_D60A
+   DEX                      		;if lives shouldn't be shown in case player doesn't have enough
+   BEQ CODE_D60A			;don't show up
    
 CODE_D5FE:
-   STA $0200,Y              
-   INY                      
-   INY                      
-   INY                      
-   INY                      
-   DEC $1E                  
-   BNE CODE_D5FB
+   STA $0200,Y				;set Y-position of OAM tile with given offset
+   INY					;\
+   INY					;|
+   INY					;|
+   INY					;/next tile's Y-position
+   DEC $1E				;life limit to be shown
+   BNE CODE_D5FB			;if not all, loop
 
 CODE_D609:  
-   RTS
+   RTS					;
 
 CODE_D60A:  
-   LDA #$F4                 
-   INX                      
-   BNE CODE_D5FE
+   LDA #$F4				;"Hide zone" - Y-position were sprite tiles don't render (i'll probably need to move this term somewhere on top)
+   INX					;they could've used INX right before CODE_D5FE
+   BNE CODE_D5FE			;that'd save 1 byte of space. I know, that's a lot.
 
+;this prepares life display, load values from table, tiles, props and X-positions
+;Y-positions point to "Hide zone", but they're get overwritten afterwards.
 CODE_D60F:
-   LDY #$00
+   LDY #$00				;
 
 CODE_D611:   
-   LDA DATA_F671,Y              
-   STA $02D0,Y
+   LDA DATA_F671,Y			;load in next order: Y-pos, sprite tile, tile prop, X-pos
+   STA $02D0,Y				;
 
-   INY                      
-   CPY #$18                 
-   BNE CODE_D611  
-   RTS
+   INY					;
+   CPY #$18				;loop untill all 6 tiles are initialized ($18/4)
+   BNE CODE_D611			;
+   RTS					;
    
 CODE_D61D:
    LDA $30                  
@@ -6372,21 +6374,21 @@ CODE_E131:
    RTS                      
    
 CODE_E132:
-   JSR CODE_D5DC			;
+   JSR CODE_D5DC			;wait for NMI
 
    LDA $0A				;
    AND #$E7				;
-   STA $2001				;only show sprites and/or foreground.
-   RTS
+   STA $2001				;turn off sprite and background display
+   RTS					;
    
 CODE_E13D:
-   JSR CODE_D5DC
+   JSR CODE_D5DC			;wait for NMI
    
-   LDA $0A                  
-   ORA #$18                 
-   STA $2001                
-   STA $0A                  
-   RTS
+   LDA $0A				;
+   ORA #$18				;enable sprites and background display
+   STA $2001				;
+   STA $0A				;
+   RTS					;
 
 CODE_E14A:   
    JSR CODE_E0B8
@@ -6976,23 +6978,24 @@ CODE_E464:
    JSR CODE_CA3B		;write stuff 
    JSR CODE_CA2B		;clear OAM
    JSR CODE_D5BE		;write score bar 
-   JSR CODE_D60F		;clear OAM...???
-   JSR CODE_D5E6		;TBC
-   JSR CODE_D5EC
-   JSR CODE_E13D
+   JSR CODE_D60F		;prepare OAM slots for lives
+   JSR CODE_D5E6		;set Mario's lives Y-position
+   JSR CODE_D5EC		;same for Luigi
+   JSR CODE_E13D		;wait for NMI and enable rendering
    
-   LDA #$00                 
-   STA $04BA
-   STA $2B
+   LDA #$00			;zero out RAM addresses for next state
+   STA $04BA			;to be investigated what they're for
+   STA $2B			;
 
-   INC $04B4
+   INC $04B4			;to the next state
 
 CODE_E489:   
-   RTS
+   RTS				;
    
 CODE_E48A:
    LDA $2B                  
-   BNE CODE_E489                
+   BNE CODE_E489
+   
    LDA $04BA                
    JSR CODE_CD9E
    
@@ -9045,16 +9048,27 @@ DATA_F638:
 .db $2C,$2D,$00,$20,$75,$02,$29,$2A
 .db $00
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;DATA_F671 - Life display OAM data
+;Format:
+;Byte 1 - Y-position
+;Byte 2 - Sprite tile to display
+;Byte 3 - Tile property
+;Byte 4 - X-position
+;Do note however that Y-position value is overwritten afterwards
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 DATA_F671:
 .db $F4,$DF,$00,$40,$F4,$DF,$00,$4C
 .db $F4,$DF,$00,$58,$F4,$DF,$01,$A8
 .db $F4,$DF,$01,$B4,$F4,$DF,$01,$C0
-.db $F4,$EE,$00,$38      
+
+;Title screen cursor OAM data, same format as above, Y-position is also overwritten.
+.db $F4,$EE,$00,$38
 
 DATA_F68D:
 .db $20,$6E,$06,$00,$20,$64,$06,$00
 .db $20,$77,$06,$00      
-
 
 DATA_F699:
 .db $10,$CD,$03,$6C,$10,$CD,$43,$73
@@ -9063,7 +9077,6 @@ DATA_F699:
 .db $00,$FF,$00,$FF,$00,$00,$00,$00
 .db $00,$00,$01,$00,$01,$00,$01,$00
 .db $01,$01,$02,$02,$02,$03,$AA
-
 
 DATA_F6C8:
 .db $01,$00,$02,$00,$2C,$05,$A1,$22
@@ -9113,7 +9126,6 @@ DATA_F722:
 .db $00,$04,$01,$04,$00,$04,$01,$04
 .db $01,$AA              
 
-   
 DATA_F81C:
 .db $00,$01,$02,$02,$01,$00,$AA
 
@@ -9148,7 +9160,7 @@ DATA_F87C:            				;a bunch of FFs. It's possible there was some coding/r
 .db $FF,$FF,$FF     
 .db $FF,$FF,$FF         
 .db $FF,$FF,$FF,$FF       
-   
+
 CODE_F8A7:
    NOP						;\and a bunch of NOPs that are here just because...?
    NOP						;|
@@ -9158,7 +9170,7 @@ CODE_F8A7:
    NOP						;|
    NOP						;/
    LDA #$C0					;\what this does?
-   STA $4017					;/it enables bits that do nothing.
+   STA $4017					;/it enables bits that do nothing. (investigate)
    JSR CODE_FA91				;
    
    LDA #$00					;
@@ -9220,6 +9232,7 @@ CODE_F8F3:
 
 DATA_F8FA:
 .db $85,$85,$85,$8D,$8D,$8D
+
 DATA_F900:
 .db $01
 .db $C4,$00,$00,$00,$69,$00,$D4
@@ -9240,7 +9253,6 @@ DATA_F94E:
 .db $06,$05,$0A,$14,$28,$50,$1E
 .db $3C,$04,$0B,$16,$2C,$58,$21
 .db $07
-
 
 CODE_F96B:
    LDY #$7F
