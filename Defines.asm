@@ -1,11 +1,13 @@
-;This file holds defines for Mario Bros. Disassembly. Both RAM adresses and values.
+;This file holds defines for Mario Bros. Disassembly. Both RAM adresses and (values, but there's non currently).
 ;Also WIP
 
 ;RAM Adresses
 
-InterruptedFlag = $23		    ;Used to determine if game got interrupted with Non-maskable interrupt. one routine specifically waits for NMI and will end waiting after it happens
+InterruptedFlag = $23       ;Used to determine if game got interrupted with Non-maskable interrupt. one routine specifically waits for NMI and will end waiting after it happens
 
 FrameCounter = $2F          ;Self-explanatory, increments every frame.
+
+DemoFlag = $30              ;flag set when demo plays
 
 Show2ndPlayerScore = $39	  ;flag for player 2 score to display
 
