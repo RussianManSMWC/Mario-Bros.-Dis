@@ -44,7 +44,7 @@ Player2DisplayFlag = $4E
 
 PowHitsLeft = $70
 
-POWEffectTimer = $71        ;timer set when POW is hit, to run hit interaction with everything on-screen. 
+POWPowerTimer = $71        ;timer set when POW is hit, to run hit interaction with everything on-screen. 
 
 HighScore = $91				;3 bytes
 
