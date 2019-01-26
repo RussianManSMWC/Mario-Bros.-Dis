@@ -75,11 +75,11 @@ CODE_C02B:
    JSR CODE_CA2B					;"clear" sprite data
    
    LDY #$00						;load 00 into Y register....
-   STA $2005						;\write to OAM
-   STA $2005						;/twice
+   STA $2005						;\initial camera position/no scroll
+   STA $2005						;/
 
-   INY							;\increase Y register...
-   STY $30						;/store to $30. why not just LDY #$01? using LDY #$01 doesn't seem to break anything...
+   INY							;\increase Y register... but I'm sure LDY #$01 could've worked just fine.
+   STY DemoFlag						;/initially demo flag is set
    
    LDA #$0F						;\enable all sound channels (except for DMC)
    STA $4015						;/
@@ -88,8 +88,8 @@ CODE_C02B:
    STA $2000						;
    STA $09						;backup enabled bits
    
-   LDA #$06						;
-   STA $0A						;
+   LDA #$06						;Bits 1 and 2 to be enabled for 2001
+   STA Reg2001BitStorage				;which are "background left column enable" and "sprite left column enable"
 
 CODE_C04F:   
    LDA #$00						;reset frame window flag
@@ -942,10 +942,10 @@ CODE_C4D9:
    DEX
    BPL CODE_C4D9
 
-   LDA $0A
-   AND #$0E
-   STA $2001
-   STA $0A
+   LDA Reg2001BitStorage		;\
+   AND #$0E				;|only leave background for render
+   STA $2001				;|
+   STA Reg2001BitStorage		;/
 
    STY $3B
 
@@ -1944,7 +1944,7 @@ CODE_CA22:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Clear Sprites loop
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;"Clears" OAM, using dummy sprite tile, and setting wild XY positions, though IDK
+;"Clears" OAM, by putting it in "Hide zone" (and setting other values we don't care about)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
    
 CODE_CA2B:				;
@@ -1954,7 +1954,7 @@ CODE_CA2B:				;
    LDY #$00				;\OAM starting point, low byte
    STY $00				;/
    
-   LDA #$F4				;use dummy tile F4, which looks like one of 8x8 tiles for 16x16 fireball (unused)
+   LDA #$F4				;dummy props
    
 CODE_CA35:
    STA ($00),y				;
@@ -2637,23 +2637,23 @@ CODE_CD81:
    RTS					;
    
 CODE_CD88:
-   LDX #$01				;Unknown (yet)
-   DEC $2A				;
+   LDX #$01				;seems to handle various timers in game
+   DEC $2A				;general timer?
    BPL CODE_CD94			;
    
-   LDA #$0A				;
+   LDA #$0A				;restore $2A
    STA $2A				;
    
-   LDX #$03				;
+   LDX #$03				;decrease timers from $2E downto $2B (otherwise only $2C and $2B)
    
 CODE_CD94:
    LDA $2B,x				;
    BEQ CODE_CD9A			;
-   DEC $2B,x				;
+   DEC $2B,x				;decrease some other timers
    
 CODE_CD9A:
    DEX					;
-   BPL CODE_CD94			;
+   BPL CODE_CD94			;loop
    RTS					;
    
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2692,7 +2692,7 @@ CODE_CDB4:
    PLA
    RTS
    
-CODE_CDC4:				;this code writes MARIO BROS. logo and stuff
+CODE_CDC4:				;this is probably tile drawing routine, that draws specific tiles at specific locations.
    STA $2006				;load locations for tile to draw
    INY					;
 
@@ -3695,26 +3695,26 @@ CODE_D2D0:
    JMP CODE_D27F
 
 CODE_D2DF:
-   LDA $70                  
-   BNE CODE_D2E4                
+   LDA PowHitsLeft			;if POW can still be hit
+   BNE CODE_D2E4			;run interaction
    RTS                      
 
 CODE_D2E4:
-   LDA $71
-   BEQ CODE_D2E9
+   LDA POWPowerTimer			;if POW isn't in effect
+   BEQ CODE_D2E9			;hit everything
    RTS
 
 CODE_D2E9:
-   LDA #$0F                 
-   STA $71
+   LDA #$0F				;set POW effect timer 
+   STA POWEffectTimer
    
-   LDA $BF                  
+   LDA $BF
    STA $72
    
-   LDA #$00                 
+   LDA #$00
    STA $2C
    
-   DEC $70                  
+   DEC PowHitsLeft			;POW's "hitpoints" -1
    JSR CODE_D593
    
    LDA $FF                  
@@ -3722,21 +3722,21 @@ CODE_D2E9:
    STA $FF        
    RTS
    
-CODE_D301
-   LDA $71
-   BNE CODE_D306
-   RTS
+CODE_D301:
+   LDA POWPowerTimer			;if POW's in effect
+   BNE CODE_D306			;decrease timers
+   RTS					;
    
 CODE_D306:
-   LDA $2C
-   BEQ CODE_D30B
-   RTS
+   LDA $2C				;
+   BEQ CODE_D30B			;
+   RTS					;
    
 CODE_D30B:
-   LDA #$01
-   STA $2C
+   LDA #$01				;
+   STA $2C				;
    
-   DEC $71
+   DEC POWPowerTimer			;decrease POW's effect timer
    
    LDY #$01
    
@@ -3777,8 +3777,8 @@ CODE_D33A:
    LDA $0500
    RTS
    
-CODE_D34A:				;probably gameplay init
-   LDA $2D				;some flag for init? timer?
+CODE_D34A:				;
+   LDA $2D				;wait a little
    BNE CODE_D3A7			;
    
    LDA #$00				;
@@ -3786,19 +3786,19 @@ CODE_D34A:				;probably gameplay init
    STA $41				;reset number display
    
    LDA #$03				;
-   STA $70				;initialize POW's hitpoints
+   STA PowHitsLeft			;initialize POW's hitpoints
    
    LDX #$02				;
    LDY #$00				;
-   STX $48				;set first player's lifes
-   STY $4A				;reset gameover flag
+   STX Player1Lives			;set first player's lifes
+   STY GameOverFlag			;reset general gameover flag
    STY $AD				;
    
-   LDA $30				;check if it's a demo movie (?)
+   LDA DemoFlag				;check if it's a demo movie (?)
    BEQ CODE_D36D			;if not, welp
    
-   LDA #$55				;timer?
-   STA $31				;
+   LDA #$55				;
+   STA $31				;timer?
    JMP CODE_D37D			;demo always has 2 players
    
 CODE_D36D:
@@ -3806,18 +3806,18 @@ CODE_D36D:
    CMP #$02				;
    BCS CODE_D37D			;set lives for second player as well
    
-   STY $4C				;otherwise don't display luigi's lifes
-   STY $9E				;and his score
+   STY Player2Lives			;otherwise don't display luigi's lifes
+   STY Player2ScoreDisplay		;and his score
    
    LDY #$FF				;
    LDA #$00				;
    BEQ CODE_D381			;
    
 CODE_D37D:
-   STX $4C				;luigi's lifes
-   
+   STX Player2Lives			;luigi's lifes
+
    LDA #$02				;
-   
+
 CODE_D381:
    STY $4E				;either disable or enable 2nd player sprite
    STY $AE				;?
@@ -3827,37 +3827,37 @@ CODE_D381:
    STA $49				;
    STA $4D				;
    
-   LDX #$07
+   LDX #$07				;
 
 CODE_D38F:
    STA $94,x				;this loop clears mario and luigi's scores
    DEX					;
    BPL CODE_D38F			;
    
-   LDY #$00				;
-   LDA $29				;check game mode
-   BEQ CODE_D39F			;if it's 1 player game B
-   CMP #$02				;
-   BEQ CODE_D39F			;or 2 players game B
-   INY					;set flag for game B
+   LDY #$00				;\check if it's game A or B
+   LDA $29				;|check chosen option
+   BEQ CODE_D39F			;|0 - Game A was chosen
+   CMP #$02				;|
+   BEQ CODE_D39F			;|2 - Game A 2 Players was chosen
+   INY					;/otherwise it's game B
    
 CODE_D39F:
-   STY $3A				;otherwise it'll assume that it's game A
+   STY GameAorBFlag			;
    
-   LDA #$01				;
-   STA $3F				;
+   LDA #$01				;\use gameplay palette
+   STA PaletteFlag			;/
    INC $40				;change game state
 
 CODE_D3A7:
    RTS					;
    
 CODE_D3A8:
-   LDA $2D                  
-   BNE CODE_D3A7
+   LDA $2D				;more timer before transitions
+   BNE CODE_D3A7			;
    
    LDA #$00                 		;reset lotta flags 'n values
-   STA $49                  		;mario's gameover flag
-   STA $4D                  		;luigi's gameover flag
+   STA MarioGameOverFlag                ;mario's gameover flag
+   STA LuigiGameOverFlag                ;luigi's gameover flag
    STA $51                  
    STA $46                  
    STA $05FB                
@@ -3989,11 +3989,11 @@ CODE_D45C:
    CMP #$0A                 
    BNE CODE_D47C
    
-   LDA $0A                  
-   ORA #$10                 
-   STA $2001                
-   STA $0A                  
-   BNE CODE_D47C
+   LDA Reg2001BitStorage		;\
+   ORA #$10				;|enable sprite render
+   STA $2001				;|
+   STA Reg2001BitStorage		;/
+   BNE CODE_D47C			;always branch, though RTS would've fit in here (and it'd save 1 byte of space)
    
 CODE_D46F:
    LDX #$05
@@ -6376,18 +6376,18 @@ CODE_E131:
 CODE_E132:
    JSR CODE_D5DC			;wait for NMI
 
-   LDA $0A				;
-   AND #$E7				;
-   STA $2001				;turn off sprite and background display
+   LDA Reg2001BitStorage		;\
+   AND #$E7				;|turn off sprite and background display
+   STA $2001				;/
    RTS					;
    
 CODE_E13D:
    JSR CODE_D5DC			;wait for NMI
    
-   LDA $0A				;
-   ORA #$18				;enable sprites and background display
-   STA $2001				;
-   STA $0A				;
+   LDA Reg2001BitStorage		;\
+   ORA #$18				;|enable sprites and background display
+   STA $2001				;|
+   STA Reg2001BitStorage		;/
    RTS					;
 
 CODE_E14A:   
@@ -6415,7 +6415,7 @@ CODE_E14F:
    BCC CODE_E170
    
    LDA #$03                 
-   STA $70
+   STA PowHitsLeft
   
 CODE_E170:
    LDA #$BB                 
@@ -6737,9 +6737,9 @@ CODE_E2FD:
    DEC $33                  
    BNE CODE_E2CF
    
-   LDA #$00                 
-   STA $04B5                
-   STA $04B6
+   LDA #$00				;\reset collected coins from bonus phase    
+   STA Player1BonusCoins		;|Mario's
+   STA Player2BonusCoins		;/Luigi's
    
    LDA #$40                 
    STA $04B3
@@ -6903,11 +6903,11 @@ CODE_E3F3:
    CMP #$01                 
    BNE CODE_E400
    
-   INC $04B5                
-   BNE CODE_E403
+   INC Player1BonusCoins		;increase "bonus coins collected" counter for player 1
+   BNE CODE_E403			;always branch
 
 CODE_E400:  
-   INC $04B6
+   INC Player2BonusCoins		;increase "bonus coins collected" counter for player 2
   
 CODE_E403:
    LDA #$E8                 
