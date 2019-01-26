@@ -3706,7 +3706,7 @@ CODE_D2E4:
 
 CODE_D2E9:
    LDA #$0F				;set POW effect timer 
-   STA POWEffectTimer
+   STA POWPowerTimer
    
    LDA $BF
    STA $72
