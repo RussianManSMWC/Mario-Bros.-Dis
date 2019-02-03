@@ -912,70 +912,70 @@ CODE_C4AE:
    RTS
    
 CODE_C4B8:
-   LDA $30					;
-   BNE CODE_C528				;
+   LDA DemoFlag					;\demo does things differently
+   BNE CODE_C528				;/
    
-   LDA $18
-   AND #$10
-   BEQ CODE_C507
+   LDA $18					;\if start button is pressed, start game
+   AND #$10					;|
+   BEQ CODE_C507				;/
    
-   LDY $26
-   BNE CODE_C50B
+   LDY $26					;\prevent start from pausing/unpausing when it's held (only when pressed)
+   BNE CODE_C50B				;/
    
-   INY
-   STY $26
+   INY						;\no INC $26? Sad day
+   STY $26					;/
    
-   LDY $40
-   CPY #$05
-   BEQ CODE_C4F9
-   CPY #$04
-   BEQ CODE_C4D7
-   CPY #$06
-   BNE CODE_C50B
+   LDY GameplayMode				;if game was paused
+   CPY #$05					;
+   BEQ CODE_C4F9				;unpause
+   CPY #$04					;
+   BEQ CODE_C4D7				;if just paused, do things
+   CPY #$06					;
+   BNE CODE_C50B				;otherwise run like normal
 
 CODE_C4D7:
-   LDX #$05
+   LDX #$05					;setup loop for some timers
    
 CODE_C4D9:
-   LDA $2A,X
-   STA $5A,X
-   DEX
-   BPL CODE_C4D9
+   LDA $2A,X					;\
+   STA $5A,X					;/back-up timers
+   DEX						;
+   BPL CODE_C4D9				;loop
 
-   LDA Reg2001BitStorage		;\
-   AND #$0E				;|only leave background for render
-   STA $2001				;|
-   STA Reg2001BitStorage		;/
+   LDA Reg2001BitStorage			;\
+   AND #$0E					;|don't show sprites
+   STA $2001					;|
+   STA Reg2001BitStorage			;/
 
-   STY $3B
+   STY $3B					;back-up gamemode
 
-   LDA #$05
-   STA $40
+   LDA #$05					;\gamemode = paused
+   STA GameplayMode				;/
 
-   LDA #$00
-   STA $FF
-   STA $FE
-   STA $FC
-   BEQ CODE_C501
+   LDA #$00					;\disable some sound effects
+   STA $FF					;|
+   STA $FE					;|
+   STA $FC					;/
+   BEQ CODE_C501				;play pause sound effect
    
 CODE_C4F9:
-   LDA #$14
-   STA $2B
+   LDA #$14					;\unpause timer
+   STA $2B					;/
    
-   LDA #$0A
-   STA $40
+   LDA #$0A					;\unpause game
+   STA GameplayMode				;/
    
 CODE_C501:
-   LDA #$08
-   STA $FD
-   BNE CODE_C50B
+   LDA #$08					;\play pause sound effect
+   STA $FD					;/
+   BNE CODE_C50B				;run gamemode
    
 CODE_C507:
-   LDA #$00
-   STA $26
+   LDA #$00					;player can press start
+   STA $26					;
    
 CODE_C50B:
-   LDA $40					;another gamemode pointer? this time for actual gameplay
+   LDA GameplayMode				;another gamemode pointer? this time for actual gameplay
    JSR CODE_CD9E				;
    
 DATA_C510:
@@ -984,8 +984,8 @@ DATA_C510:
    .dw CODE_D3F9				;more init - sets Game A or B flag and enables gameplay palette flag
    .dw CODE_D3A8				;actual gameplay
    
-   .dw CODE_C5A3				;game pause?
-   .dw CODE_D5E5				;return
+   .dw CODE_C5A3				;game pause init (?)
+   .dw CODE_D5E5				;paused (return)
    .dw CODE_E453				;coin counting after "Test Your Skill!" phase
    .dw CODE_D5E5				;return
    
@@ -994,32 +994,32 @@ DATA_C510:
    .dw CODE_D45C				;unpause
    .dw CODE_E28B				;game over
 
-   
+;Code related with Demo recording.
 CODE_C528:
-   LDA $18
-   AND #$30
-   CMP #$10
-   BNE CODE_C543
+   LDA $18					;
+   AND #$30					;
+   CMP #$10					;if player pressed start, start the game
+   BNE CODE_C543				;
    
-   LDA #$00
-   STA $30
-   STA $40
+   LDA #$00					;\
+   STA $30					;|reset demo flag
+   STA $40					;/initialize gameplay
    
-   JSR CODE_D4FE
-   JSR CODE_E132
+   JSR CODE_D4FE				;
+   JSR CODE_E132				;
    
-   LDA #$02
-   STA $2A
-   STA $2D
-   RTS
+   LDA #$02					;
+   STA $2A					;
+   STA $2D					;
+   RTS						;
    
 CODE_C543:
-   LDX $50
-   BEQ CODE_C58E
-   CMP #$20                 
-   BNE CODE_C568                
-   CPX #$01                 
-   BNE CODE_C561
+   LDX $50					;\if it's title screen init
+   BEQ CODE_C58E				;/don't check things
+   CMP #$20                 			;\check if pressed select
+   BNE CODE_C568                		;/
+   CPX #$01                 			;\if it was pressed when on title screen, move cursor
+   BNE CODE_C561				;/
    
    LDA $28                  
    BNE CODE_C574
@@ -1042,7 +1042,7 @@ CODE_C561:
    BEQ CODE_C58E
 
 CODE_C568:   
-   CMP #$00                 
+   CMP #$00       
    BNE CODE_C570 
    
    STA $28                  
@@ -1061,17 +1061,17 @@ CODE_C574:
    STA $2D
 
 CODE_C57E:   
-   CPX #$01                 
-   BNE CODE_C58E
+   CPX #$01					;\don't handle cursor if it's not title screen
+   BNE CODE_C58E				;/
    
-   LDA $29                  
-   ASL A             
-   ASL A  
-   ASL A      
-   ASL A        
-   CLC                      
-   ADC #$80                 
-   STA $0200
+   LDA $29					;\handle cursor's position
+   ASL A					;|
+   ASL A					;|
+   ASL A					;|
+   ASL A					;|
+   CLC						;|
+   ADC #$80					;|
+   STA $0200					;/
  
 CODE_C58E:   
    LDA $50  					;\Set up pointers based on $50 value                
@@ -1087,7 +1087,7 @@ DATA_C593:
    .dw CODE_D4AF				;playing title screen demo recording (or actual gameplay?)
    .dw CODE_D448				;reset pointer
    
-CODE_C5A3:					;seems to handle all things during normal gameplay
+CODE_C5A3:					;
    JSR CODE_D56E             
    JSR CODE_D202
    JSR CODE_D301                
