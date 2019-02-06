@@ -123,8 +123,8 @@ CODE_C06A:
    JMP CODE_C04F					;run some routines that update things every frame, like sounds and stuff
    
 CODE_C077:
-   JSR CODE_D328
-   JMP CODE_C06A
+   JSR CODE_D328					;randomize numbers in a mean time
+   JMP CODE_C06A					;
 
 NMI:
    PHA							;\usual stuff - save all registers
@@ -3757,24 +3757,24 @@ CODE_D31F:
    RTS
    
 CODE_D328:
-   LDA $0500
-   AND #$02
-   STA $07
+   LDA $0500				;Random number data pool... i think
+   AND #$02				;
+   STA $07				;
    
-   LDA $0501
-   AND #$02
-   EOR $07
-   CLC
-   BEQ CODE_D33A
-   SEC
+   LDA $0501				;random number
+   AND #$02				;
+   EOR $07				;
+   CLC					;
+   BEQ CODE_D33A			;if value isn't zero, don't set carry
+   SEC					;
 
 CODE_D33A:
-   ROR $0500
-   ROR $0501
-   ROR $0502
-   ROR $0503
+   ROR $0500				;
+   ROR $0501				;
+   ROR $0502				;
+   ROR $0503				;
 
-   LDA $0500
+   LDA $0500				;$0500 contains random number
    RTS
    
 CODE_D34A:				;
