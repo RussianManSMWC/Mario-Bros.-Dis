@@ -1957,10 +1957,10 @@ CODE_CA2B:				;
    LDA #$F4				;dummy props
    
 CODE_CA35:
-   STA ($00),y				;
-   DEY					;
-   BNE CODE_CA35			;loop
-   RTS					;
+   STA ($00),y				;\this piece of code is also called by other routine
+   DEY					;|
+   BNE CODE_CA35			;|
+   RTS					;/
 
 CODE_CA3B:
    LDA #$3F
@@ -6331,23 +6331,32 @@ DATA_E078:
 .db $0A,$16,$0E,$24,$18,$1F,$0E,$1B
 .db $1F,$24,$24,$24,$24,$24,$24,$24
 .db $24,$24,$24,$24,$24,$24,$24,$24
-   
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;This subroutine resets RAM addresses
+;$0300-$0400.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;USED RAM ADRESSES:
+;$00 - RAM Pointer (low byte)
+;$01 - RAM Pointer (high byte)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 CODE_E0B8:
-   LDA #$03                 
-   STA $01
+   LDA #$03				;set-up range for ram clean-up
+   STA $01				;
    
-   LDA #$00                 
-   STA $00 
-   TAY                      
-   JSR CODE_CA35
+   LDA #$00 				;
+   STA $00				;
+   TAY					;
+   JSR CODE_CA35			;first clear $0300-$03FF
    
-   LDA #$04                 
-   STA $01
+   LDA #$04				;then set-up range and clear $0400-$04FF
+   STA $01				;
    
-   LDA #$00                 
-   STA $00                  
-   TAY                      
-   JMP CODE_CA35                
+   LDA #$00				;
+   STA $00				;
+   TAY					;
+   JMP CODE_CA35			;
 
 DATA_E0D0:
 .db $00,$00,$00,$00,$01,$00,$00,$00
@@ -6391,92 +6400,92 @@ CODE_E13D:
    RTS					;
 
 CODE_E14A:   
-   JSR CODE_E0B8
+   JSR CODE_E0B8			;reset some RAM adresses
    
-   LDX $31
+   LDX $31				;get phase properties index
    
 CODE_E14F:
-   LDA DATA_E0D0,X              
-   CMP #$AA                 
-   BNE CODE_E188                
-   INX                      
-   LDA DATA_E0D0,X              
-   STA $32
+   LDA DATA_E0D0,X			;if first property byte is           
+   CMP #$AA                 		;$AA, it's "Test Your Skill" time.
+   BNE CODE_E188                	;
+   INX					;
+   LDA DATA_E0D0,X			;second prop. byte
+   STA $32				;contains 8x8 tile index platforms are made of
    
-   INX                      
-   LDA DATA_E0D0,X              
-   STA $04B1
+   INX					;
+   LDA DATA_E0D0,X			;third prop. byte is initial timer, seconds
+   STA BonusTimeSecs			;
    
-   INX                      
-   STX $31
+   INX					;
+   STX $31				;store index+1 for next property load
    
-   LDA $41                  
-   CMP #$07                 
-   BCC CODE_E170
+   LDA $41				;If phase's number is less than 7
+   CMP #$07				;
+   BCC CODE_E170			;don't restore POW
    
-   LDA #$03                 
-   STA PowHitsLeft
+   LDA #$03				;after bonus POW is restored
+   STA PowHitsLeft			;
   
 CODE_E170:
-   LDA #$BB                 
-   STA $35
+   LDA #$BB                 		;
+   STA $35				;
    
    JSR CODE_D67F
    
-   LDA #$00                 
-   STA $030A
+   LDA #$00				;
+   STA $030A				;
    
-   LDA #$18                 
-   STA $032A
+   LDA #$18				;
+   STA $032A				;
    
-   LDA #$01                 
-   STA $04B0
-   BNE CODE_E1C4
+   LDA #$01				;skip over some code
+   STA $04B0				;
+   BNE CODE_E1C4			;
   
 CODE_E188:
-   CMP #$FF                 
-   BNE CODE_E190
+   CMP #$FF				;Or $FF, repeat
+   BNE CODE_E190			;
    
-   LDX #$41                 
-   BNE CODE_E14F
+   LDX #$41				;I assume this makes load previous properties, ending up in a repeat (so it doesn't end up loading incorrect values and cause "Kill Screen")
+   BNE CODE_E14F			;start prop. loading over
   
 CODE_E190:
-   LDA DATA_E0D0,X              
-   STA $34
+   LDA DATA_E0D0,X			;store first prop. byte in $34 (not sure why you have to reload it but whatev)
+   STA $34				;contains "enemy level"
    
-   INX                      
-   LDA DATA_E0D0,X              
-   STA $32
+   INX					;second prop.
+   LDA DATA_E0D0,X			;contains platform tile index
+   STA $32				;in da $32
    
-   INX                      
-   LDY #$01                 
-   LDA $41                  
-   CMP #$08                 
-   BCC CODE_E1A7                
-   STY $04C0
+   INX					;
+   LDY #$01				;
+   LDA $41				;if phase number is less than 8, don't make freezies appear
+   CMP #$08				;
+   BCC CODE_E1A7			;
+   STY $04C0				;
    
 CODE_E1A7:
-   LDA DATA_E0D0,X              
-   STA $04F3
+   LDA DATA_E0D0,X			;third prop.
+   STA $04F3				;timer index for wavy fireball frequency
    
-   INX                      
-   LDA DATA_E0D0,X              
-   STA $04FC                
-   INX                      
-   STX $31
+   INX					;forth and last phase prop.
+   LDA DATA_E0D0,X			;
+   STA $04FC				;timer index for diagonal reflecting fireball frequency
+   INX					;
+   STX $31				;store prop. index for next time we enter this routine
    
-   LDA #$00                 
-   STA $35                  
-   JSR CODE_E97A                
-   JSR CODE_D67F                
-   JSR CODE_D69A
+   LDA #$00				;reset "enemies to defeat" index (?)
+   STA $35				;
+   JSR CODE_E97A			;
+   JSR CODE_D67F			;
+   JSR CODE_D69A			;
    
 CODE_E1C4:
-   JSR CODE_D672               
-   JSR CODE_D3F9
+   JSR CODE_D672			;
+   JSR CODE_D3F9			;
    
-   LDA #$02                 
-   BNE CODE_E1F4                
+   LDA #$02				;
+   BNE CODE_E1F4			;
    
 CODE_E1CE:
    LDA $35                  
