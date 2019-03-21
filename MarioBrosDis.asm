@@ -2476,28 +2476,28 @@ CODE_CCC2:
    RTS
    
 CODE_CCC5:
-   LDX #$01
-   STX $4016
-   DEX
-   TXA
-   STA $4016
-   JSR CODE_CCD3
-   INX
+   LDX #$01				;\prepare controller 2 for reading
+   STX $4016				;/
+   DEX					;\
+   TXA					;|prepare controller 1 for reading
+   STA $4016				;/
+   JSR CODE_CCD3			;read input bits for controller 1
+   INX					;then controller 2
    
 CODE_CCD3:
-   LDY #$08
+   LDY #$08				;8 bits, of course
    
 CODE_CCD5:
-   PHA
-   LDA $4016,x
+   PHA					;
+   LDA $4016,x				;load whatever bit
    
-   STA $00
-   LSR A
-   ORA $00
-   LSR A
-   PLA
-   ROL A
-   DEY
+   STA $00				;store here
+   LSR A				;\
+   ORA $00				;|get rid of all bits but bit zero (that happens)
+   LSR A				;/
+   PLA					;"sum" active bits
+   ROL A				;
+   DEY					;
    BNE CODE_CCD5
    
    STX $00
