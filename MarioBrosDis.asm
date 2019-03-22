@@ -2495,29 +2495,29 @@ CODE_CCD5:
    LSR A				;\
    ORA $00				;|get rid of all bits but bit zero (that happens)
    LSR A				;/
-   PLA					;"sum" active bits
-   ROL A				;
-   DEY					;
-   BNE CODE_CCD5
+   PLA					;
+   ROL A				;"sum" active bits
+   DEY					;\
+   BNE CODE_CCD5			;/next button check
    
-   STX $00
-   ASL $00
-   LDX $00
-   LDY $18,x
-   STY $00
-   STA $18,x
-   STA $19,x
-   AND #$FF
-   BPL CODE_CCFE
+   STX $00				;\get index for single frame press
+   ASL $00				;|
+   LDX $00				;|
+   LDY $18,x				;|
+   STY $00				;/store to scratch ram
+   STA $18,x				;\store controller input (holding)
+   STA $19,x				;/(press)
+   AND #$FF				;\if A and B are pressed
+   BPL CODE_CCFE			;/meh
    
-   BIT $00
-   BPL CODE_CCFE
+   BIT $00				;if these buttons are pressed again
+   BPL CODE_CCFE			;don't reset bits
    
-   AND #$7F
-   STA $19,x
+   AND #$7F				;\reset A and B press bits
+   STA $19,x				;/
    
 CODE_CCFE:
-   RTS
+   RTS					;
    
 CODE_CCFF:
    LDA $21
@@ -4055,7 +4055,7 @@ CODE_D4A0:
    JMP CODE_D3A8
 
 CODE_D4AF:   
-   LDY $56                  
+   LDY $56
    BNE CODE_D4CA
    
    LDX $55                  
