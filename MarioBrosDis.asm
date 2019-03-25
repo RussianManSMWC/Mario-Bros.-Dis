@@ -484,31 +484,31 @@ CODE_C27B:
    STY $032D
    RTS
    
-CODE_C282:
-   LDX #$05
-   LDY #$42
+CODE_C282:			;if luigi touches mario from side while airborn
+   LDX #$05			;make mario face left if applicable
+   LDY #$42			;make luigi face right, keep gravity
    
 CODE_C286:
-   STY $0321
+   STY $0321			;
    
-   LDA $B1
-   AND #$08
-   BNE CODE_C2A7
+   LDA $B1			;if mario is playing "squishing" animation (?)
+   AND #$08			;
+   BNE CODE_C2A7		;don't push him
    
-   STX $B1
-   JSR CODE_C3E3
+   STX $B1			;push a little to the right
+   JSR CODE_C3E3		;
    
-   LDA $C4
-   STA $00
+   LDA $C4			;
+   STA $00			;
    
-   LDA $CD
-   STA $01
+   LDA $CD			;
+   STA $01			;
    
-   JSR CODE_C3C2
-   STA $C2
+   JSR CODE_C3C2		;
+   STA $C2			;
    
-   LDA $00                  
-   BEQ CODE_C2A7
+   LDA $00			;
+   BEQ CODE_C2A7		;
    STA $B4
    
 CODE_C2A7:
@@ -753,16 +753,16 @@ CODE_C3DC:
    RTS
    
 CODE_C3E3:
-   LDA $C4                  
-   PHA           
-   LDA $0334                
-   STA $C4                  
-   PLA                      
-   STA $0334
+   LDA $C4			;\swap speed modifiers
+   PHA				;|
+   LDA $0334			;|luigi with mario and mario with luigi
+   STA $C4			;|
+   PLA				;|
+   STA $0334			;/
    
-   LDA #$01                 
-   STA $05FD                
-   RTS
+   LDA #$01			;\slow down luigi
+   STA $05FD			;|
+   RTS				;/
    
 CODE_C3F5:
    CLC
