@@ -141,13 +141,13 @@ NMI:
    LDA $22						;some sort of "update" flag that allows NMI to update things
    BEQ CODE_C0AC					;although it doesn't do much in practice.
    
-   JSR CODE_CB58					;some important routines, probably to keep Graphics on screen and etc.
-   JSR CODE_EE6A					;
-   JSR CODE_CCFF            				;   
-   JSR CODE_CA66            				;   
-   JSR CODE_CE09            				;   
-   JSR CODE_CCC5            				;   
-   JSR CODE_CAF7    					;seems to handle player's collision and enemy movement
+   JSR CODE_CB58					;checks acts-like?
+   JSR CODE_EE6A					;handles freezie's platform freezing
+   JSR CODE_CCFF            				;handles bumping platform from below 
+   JSR CODE_CA66            				;handle palette
+   JSR CODE_CE09            				;keep camera still
+   JSR CODE_CCC5            				;handle controllers
+   JSR CODE_CAF7    					;handle gravity and interactions?
 
    LDY #$01						;"Frame has passed" flag.
    STY $20						;
@@ -9068,9 +9068,12 @@ DATA_F638:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 DATA_F671:
-.db $F4,$DF,$00,$40,$F4,$DF,$00,$4C
-.db $F4,$DF,$00,$58,$F4,$DF,$01,$A8
-.db $F4,$DF,$01,$B4,$F4,$DF,$01,$C0
+.db $F4,$DF,$00,$40				;\
+.db $F4,$DF,$00,$4C				;|mario lives
+.db $F4,$DF,$00,$58				;/
+.db $F4,$DF,$01,$A8				;\
+.db $F4,$DF,$01,$B4				;|luigi lives
+.db $F4,$DF,$01,$C0				;/
 
 ;Title screen cursor OAM data, same format as above, Y-position is also overwritten.
 .db $F4,$EE,$00,$38
@@ -9178,15 +9181,15 @@ CODE_F8A7:
    NOP						;|
    NOP						;|
    NOP						;/
-   LDA #$C0					;\what this does?
-   STA $4017					;/it enables bits that do nothing. (investigate)
-   JSR CODE_FA91				;
+   LDA #$C0					;\
+   STA $4017					;/set APU frame counter to 4-step sequence and clear frame interrupt flag
+   JSR CODE_FA91				;play sound effects and music and stuff
    
-   LDA #$00					;
-   STA $FF					;
-   STA $FE					;
-   STA $FD					;
-   STA $4011					;
+   LDA #$00					;\clear sound effect flags
+   STA $FF					;|
+   STA $FE					;|
+   STA $FD					;|
+   STA $4011					;/and DMC load counter
    RTS						;
    
 CODE_F8C2:
@@ -9490,14 +9493,14 @@ CODE_FA8E:
    
 CODE_FA91:
    LDA $FA					;seems to be related with sound effect/music playing (sound engine)
-   BNE CODE_FAD1				;I hope it's easier than it looks
+   BNE CODE_FAD1				;play title screen music?
    LDY $FF					;
-   LDA $F0					;If value in $F0
-   LSR A					;/2
-   BCS CODE_FA8B				;if it caused bits to shift onto carry flag, branch
-   LSR $FF					;Divide FF by 2
-   BCS CODE_FA88				;did it caused set carry flag? branch if some
-   LSR A					;I hope you get the idea
+   LDA $F0					;
+   LSR A					;
+   BCS CODE_FA8B				;
+   LSR $FF					;
+   BCS CODE_FA88				;
+   LSR A					;
    BCS CODE_FA2D				;
    LSR $FF					;
    BCS CODE_FA8E				;
@@ -9527,7 +9530,7 @@ CODE_FA91:
    BCS CODE_FB0F				;
    
 CODE_FAD1:
-   JMP CODE_FCC9				;if there's no sound to play... more checkes
+   JMP CODE_FCC9				;
    
 CODE_FAD4:
    LDX #$11
