@@ -41,10 +41,10 @@ vblankloop:
    BPL vblankloop					;required to enable other PPU registers
 
    LDX #$00						;
-   STX $2000						;
-   STX $2001						;
-   DEX							;
-   TXS							;
+   STX $2000						;disable non-masked interrupt
+   STX $2001						;disable rendering
+   DEX							;\
+   TXS							;/iniria;ize stack
    
    LDX $70						;why this is needed?
    
@@ -1993,23 +1993,23 @@ CODE_CA65:
    RTS
   
 CODE_CA66:
-   LDY $3F
-   BEQ CODE_CA65
-   DEY
-   BEQ CODE_CA73
+   LDY PaletteFlag		;check if it should update palette
+   BEQ CODE_CA65		;return if not
+   DEY				;check if supposed to load gameplay palette
+   BEQ CODE_CA73		;do so if set, otherwise set palette for title screen
    
-   LDA #$27
-   LDX #$F2
-   BNE CODE_CA77
+   LDA #$27			;Setup address to read data from (DATA_F227)
+   LDX #$F2			;
+   BNE CODE_CA77		;
 
 CODE_CA73:
-   LDA #$03
-   LDX #$F2
+   LDA #$03			;setup different data address to read from (DATA_F203)
+   LDX #$F2			;
    
 CODE_CA77:
-   LDY #$00
-   STY $3F
-   BEQ CODE_CA5E
+   LDY #$00			;
+   STY $3F			;update once, don't waste time
+   BEQ CODE_CA5E		;lets go call routine and store palettes to VRAM
 
 CODE_CA7D:
    LDA $00
@@ -8885,14 +8885,46 @@ DATA_F1E7:
 .db $21,$20,$4E,$21,$32,$4E,$21,$E8
 .db $50,$22,$00,$44,$22,$1C,$44,$22
 .db $A0,$4C,$22,$B4,$4C,$00,$23,$60
-.db $60,$23,$80,$60,$3F,$00,$20,$0F
-.db $30,$2C,$12,$0F,$30,$29,$09,$0F
-.db $30,$27,$18,$0F,$30,$26,$06,$0F
-.db $16,$37,$12,$0F,$30,$27,$19,$0F
-.db $30,$27,$16,$0F,$2C,$12,$25,$00
-.db $3F,$00,$14,$0F,$16,$16,$16,$0F
-.db $27,$27,$27,$0F,$30,$2C,$12,$0F
-.db $30,$29,$19,$0F,$35,$35,$35,$00
+.db $60,$23,$80,$60
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;DATA_F203 - Palette Data
+;This is where Palette data uploaded to VRAM is located.
+;It uses generic PPU write format, as other tables that use CODE_CE00 (to be explained).
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+DATA_F203:
+.db $3F,$00				;PPU Address to write to
+
+.db $20					;How many bytes to write (32 in dec)
+
+;Gameplay Palette, used during, well, gameplay, including demo.
+.db $0F,$30,$2C,$12			;>Background 0, used by Phase 1's platforms, frozen platforms, POW and player's roman number tiles
+.db $0F,$30,$29,$09			;>Background 1, used by pipes
+.db $0F,$30,$27,$18			;>Background 2, used by bonus phases' platforms, phase 4 platforms and phase 9 onward's platforms
+.db $0F,$30,$26,$06			;>Background 3, used by phase 6's platforms
+
+.db $0F,$16,$37,$12			;>Sprite 0, used by Mario and fighter fly
+.db $0F,$30,$27,$19			;>Sprite 1, used by Luigi shellcreepers and fireballs
+.db $0F,$30,$27,$16			;>Sprite 2, used by sidesteppers and fireballs
+.db $0F,$2C,$12,$25			;>Sprite 3, used last enemy and by freezies
+
+.db $00					;Command used to stop writing.
+
+DATA_F227:
+.db $3F,$00				;PPU Address
+
+.db $14					;Write 20 bytes to PPU. That means no Sprite Palette 2-4 overwrite.
+
+;Palette used for title screen.
+.db $0F,$16,$16,$16			;>Background 0, used by MARIO BROS. logo
+.db $0F,$27,$27,$27			;>Background 1, used by option strings
+.db $0F,$30,$2C,$12			;>Background 2, used by logo's top border and copyright strings
+.db $0F,$30,$29,$19			;>Background 3, used by logo's bottom border
+
+.db $0F,$35,$35,$35			;>Sprite 1, used by select sprite
+
+.db $00					;stop writing
 
 DATA_F23F:
 .db $23,$C0,$10,$00,$00,$C0,$30,$00
