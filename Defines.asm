@@ -32,7 +32,7 @@ Show2ndPlayerScore = $39		;flag for player 2 score to display
 
 GameAorBFlag = $3A			;self explanatory, set if player chose game B
 
-PaletteFlag = $3F			;If 1, use palette for normal gameplay, otherwise use title screen palette.
+PaletteFlag = $3F			;Wether or not game should update palette, and which palette to use. $00 - Don't update, keep current palette, $01 - Gameplay Palette, anything else - Title Screen Palette.
 
 GameplayMode = $40			;used for pointers to handle various gameplay aspects, such as (un)pausing, proceeding to next phase, coin counting after "Test Your Skill!" and other.
 
