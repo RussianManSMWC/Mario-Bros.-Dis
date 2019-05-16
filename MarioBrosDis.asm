@@ -106,8 +106,8 @@ CODE_C05D:
    JSR CODE_F8A7					;sound engine of some sorts
    
 CODE_C060:
-   JSR CODE_CD88					;
-   JSR CODE_C4B8					;
+   JSR CODE_CD88					;handle various timers
+   JSR CODE_C4B8					;handle gamemodes
 
    LDA #$01						;
    STA $22						;
@@ -188,7 +188,7 @@ CODE_C0C2:
    
    LDY #$0B
    LDX #$08
-   JSR CODE_C44A
+   JSR CODE_C44A					;check interaction between players?
    STA $05F7
    ORA #$00
    BEQ CODE_C149
@@ -1021,11 +1021,11 @@ CODE_C543:
    CPX #$01                 			;\if it was pressed when on title screen, move cursor
    BNE CODE_C561				;/
    
-   LDA $28                  
+   LDA $28
    BNE CODE_C574
    
    LDY $29                  
-   INY                      
+   INY
    CPY #$04                 
    BNE CODE_C55C
 
@@ -2692,11 +2692,24 @@ CODE_CDB4:
    PLA
    RTS
    
-CODE_CDC4:				;this is probably tile drawing routine, that draws specific tiles at specific locations.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;Layout building routine
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;This routine draws tiles from table, accessed via indirect addressing
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;USED RAM ADRESSES:
+;$00 - Table location in ROM, low byte
+;$01 - Table location in ROM, high byte
+;$09 - contains previously enabled bits of $2000
+;PPU registers:
+;$2000, $2002, $2005, $2006, $2007
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CODE_CDC4:				;
    STA $2006				;load locations for tile to draw
    INY					;
 
-   LDA ($00),y				;low byte
+   LDA ($00),y				; low byte
    STA $2006				;
    INY					;
 
@@ -2744,6 +2757,8 @@ CODE_CE00:
    LDY #$00
    LDA ($00),y
    BNE CODE_CDC4
+
+;layout routine basically ends here, it flows into this routine (it's called from NMI)
 
 CODE_CE09:   
    PHA
@@ -3919,13 +3934,13 @@ CODE_D3F9:
    RTS               			;       
    
 CODE_D40B:
-   JSR CODE_E132 			;    
-   JSR CODE_CA20            		;   
-   JSR CODE_CA2B
+   JSR CODE_E132 			;turn off rendering 
+   JSR CODE_CA20            		;clear screen
+   JSR CODE_CA2B			;clear OAM
    
-   LDX #$A5                 
-   LDY #$F0                 
-   JSR CODE_D5D5
+   LDX #$A5				;draw title screen behind scenes
+   LDY #$F0				;
+   JSR CODE_D5D5			;
    
    LDA #$02                 
    STA $3F
@@ -8839,47 +8854,155 @@ DATA_F089:
 .db $1E,$14,$14,$12,$14,$12,$0A,$08
    
 DATA_F0A1:
-.db $CC,$9C,$6C,$3C,$20,$83,$02,$76
-.db $7A,$20,$A3,$02,$77,$79,$20,$9A
-.db $02,$7C,$7E,$20,$BA,$02,$7D,$7F
-.db $21,$63,$02,$80,$82,$21,$83,$02
-.db $81,$83,$21,$7A,$02,$84,$86,$21
-.db $9A,$02,$85,$87,$20,$85,$4A,$7B
-.db $20,$90,$4A,$7B,$21,$85,$4A,$89
-.db $21,$90,$4A,$89,$20,$C3,$19,$78
-.db $24,$24,$68,$69,$69,$6B,$69,$68
+.db $CC,$9C,$6C,$3C
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;Title screen tile layout data and attributes
+;basically tilemap of title screen - logo and strings
+;uses same data structure as other tables that use CODE_CE00
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+DATA_F0A5:
+.db $20,$83			;location to write to
+.db $02				;amount of bytes to write in line
+.db $76,$7A			;tiles to write
+
+.db $20,$A3			;next location
+.db $02				;amount of tiles
+.db $77,$79			;tiles
+
+.db $20,$9A			;etc.
+.db $02
+.db $7C,$7E
+
+.db $20,$BA
+.db $02
+.db $7D,$7F
+
+.db $21,$63
+.db $02
+.db $80,$82
+
+.db $21,$83
+.db $02
+.db $81,$83
+
+.db $21,$7A
+.db $02
+.db $84,$86
+
+.db $21,$9A
+.db $02
+.db $85,$87
+
+.db $20,$85
+.db $4A				;if bit 6 is set, it'll reset that bit and repeat a single tile multiple times (probably not entirely true)
+.db $7B				;so, bit 6 is reset, so it'll write $0A of this tile in a row
+
+.db $20,$90
+.db $4A
+.db $7B
+
+.db $21,$85
+.db $4A
+.db $89
+
+.db $21,$90
+.db $4A
+.db $89
+
+.db $20,$C3
+.db $19				;this time we write 25 tiles in a row
+.db $78,$24,$24,$68,$69,$69,$6B,$69,$68
 .db $69,$68,$6B,$69,$24,$68,$69,$68
 .db $69,$6B,$69,$6B,$69,$24,$24,$88
-.db $20,$E6,$13,$68,$6A,$6A,$6E,$6A
+
+.db $20,$E6
+.db $13				;this time 19 tiles
+.db $68,$6A,$6A,$6E,$6A
 .db $68,$6A,$68,$6E,$6A,$24,$68,$6A
-.db $68,$6A,$6E,$6A,$6E,$71,$21,$06
-.db $13,$68,$6A,$6A,$68,$6C,$68,$6D
+.db $68,$6A,$6E,$6A,$6E,$71
+
+.db $21,$06
+.db $13
+.db $68,$6A,$6A,$68,$6C,$68,$6D
 .db $68,$6E,$6A,$24,$68,$6D,$68,$6D
-.db $6E,$6A,$6F,$69,$21,$26,$13,$68
-.db $6A,$6A,$6E,$6A,$68,$6A,$68,$6E
+.db $6E,$6A,$6F,$69
+
+.db $21,$26
+.db $13
+.db $68,$6A,$6A,$6E,$6A,$68,$6A,$68,$6E
 .db $6A,$24,$68,$6A,$68,$6A,$6E,$6A
-.db $72,$6A,$21,$43,$19,$78,$24,$24
-.db $68,$6A,$6A,$6E,$6A,$68,$6A,$68
-.db $6F,$70,$24,$68,$70,$68,$6A,$6F
-.db $70,$6F,$70,$73,$24,$88,$22,$09
-.db $0F,$01,$24,$19,$15,$0A,$22,$0E
+.db $72,$6A
+
+.db $21,$43
+.db $19
+.db $78,$24,$24,$68,$6A,$6A,$6E,$6A
+.db $68,$6A,$68,$6F,$70,$24,$68,$70
+.db $68,$6A,$6F,$70,$6F,$70,$73,$24,$88
+
+
+;this is where strings are stored (1 PLAYER GAME A, 2 PLAYER GAME B, etc.)
+
+;1 PLAYER GAME A
+.db $22,$09
+.db $0F
+.db $01,$24,$19,$15,$0A,$22,$0E
 .db $1B,$24,$10,$0A,$16,$0E,$24,$0A
-.db $22,$49,$0F,$01,$24,$19,$15,$0A
+
+;1 PLAYER GAME B
+.db $22,$49
+.db $0F
+.db $01,$24,$19,$15,$0A
 .db $22,$0E,$1B,$24,$10,$0A,$16,$0E
-.db $24,$0B,$22,$89,$0F,$02,$24,$19
+.db $24,$0B
+
+;2 PLAYER GAME A
+.db $22,$89
+.db $0F
+.db $02,$24,$19
 .db $15,$0A,$22,$0E,$1B,$24,$10,$0A
-.db $16,$0E,$24,$0A,$22,$C9,$0F,$02
-.db $24,$19,$15,$0A,$22,$0E,$1B,$24
-.db $10,$0A,$16,$0E,$24,$0B,$23,$05
-.db $16,$25,$01,$09,$08,$03,$24,$17
+.db $16,$0E,$24,$0A
+
+;2 PLAYER GAME B
+.db $22,$C9
+.db $0F
+.db $02,$24,$19,$15,$0A,$22,$0E,$1B,$24
+.db $10,$0A,$16,$0E,$24,$0B
+
+;(c)1983 NINTENDO CO.,LTD.
+.db $23,$05
+.db $16
+.db $25,$01,$09,$08,$03,$24,$17
 .db $12,$17,$1D,$0E,$17,$0D,$18,$24
-.db $0C,$18,$28,$15,$1D,$0D,$26,$23
-.db $4B,$0D,$16,$0A,$0D,$0E,$24,$12
-.db $17,$24,$13,$0A,$19,$0A,$17,$23
-.db $C8,$0F,$AA,$2A,$0A,$0A,$0A,$0A
+.db $0C,$18,$28,$15,$1D,$0D,$26
+
+;MADE IN JAPAN
+.db $23,$4B
+.db $0D
+.db $16,$0A,$0D,$0E,$24,$12
+.db $17,$24,$13,$0A,$19,$0A,$17
+
+;finally, attributes to give our tiles some color
+.db $23,$C8
+.db $0F
+.db $AA,$2A,$0A,$0A,$0A,$0A
 .db $8A,$00,$FF,$30,$00,$00,$00,$00
-.db $C0,$23,$D8,$48,$FF,$23,$E0,$50
-.db $55,$23,$F0,$48,$AA,$00
+.db $C0
+
+.db $23,$D8
+.db $48				;repeat 8 times same attribute
+.db $FF
+
+.db $23,$E0
+.db $50
+.db $55
+
+.db $23,$F0
+.db $48
+.db $AA
+
+.db $00				;end writing (finally)
 
 DATA_F1E7:
 .db $21,$20,$4E,$21,$32,$4E,$21,$E8
