@@ -2770,23 +2770,26 @@ CODE_CE09:
    RTS
 
 CODE_CE16:
-   LDA #$00                 
-   STA $03
+   LDA #$00				;set up address we're copying data to      
+   STA $03				;
    
-   LDA #$02                 
-   STA $04
+   LDA #$02				;it's OAM data, starting from first slot
+   STA $04				;
    
-   LDY $02                  
-   DEY                      
-   LDX $02
-   
+   LDY $02				;load offset
+   DEY					;-1
+   LDX $02				;load amount of bytes to copy
+
+;this routine is used to store data from one area of addresses to another (from ROM to RAM or RAM to RAM)
+;it's only called from one place in ROM, which is a shame.
+
 CODE_CE23:
-   LDA ($00),Y              
-   STA ($03),Y              
-   DEY                      
-   DEX                      
-   BNE CODE_CE23                
-   RTS                      
+   LDA ($00),Y				;
+   STA ($03),Y				;
+   DEY					;
+   DEX					;
+   BNE CODE_CE23			;
+   RTS					;
    
 CODE_CE2C:
    LDA #$01                 
@@ -3942,51 +3945,51 @@ CODE_D40B:
    LDY #$F0				;
    JSR CODE_D5D5			;
    
-   LDA #$02                 
-   STA $3F
+   LDA #$02				;use title screen's palettes    
+   STA PaletteFlag			;
    
-   LDA #$01                 
-   STA $28
+   LDA #$01				;makes cursor move when select is pressed (not held)
+   STA $28				;
    
-   LDA #$89                 
-   STA $00
+   LDA #$89				;setup for cursor sprite
+   STA $00				;
    
-   LDA #$F6                 
-   STA $01
+   LDA #$F6				;set-up location to get cursor's OAM data
+   STA $01				;it's DATA_F689
    
-   LDA #$04                 
-   STA $02                  
-   JSR CODE_CE16
+   LDA #$04				;4 bytes to transfer
+   STA $02				;
+   JSR CODE_CE16			;
    
-   INC $50
+   INC $50				;next pointer
    
-   LDY $52                  
-   BNE CODE_D440
+   LDY $52				;set-up timer for... something?
+   BNE CODE_D440			;needs investigation
    
-   LDY #$02                 
-   STY $52
+   LDY #$02				;
+   STY $52				;
    
-   LDA #$4F                 
-   BNE CODE_D444
+   LDA #$4F				;
+   BNE CODE_D444			;
   
 CODE_D440:
-   DEC $52
+   DEC $52				;
    
-   LDA #$25
+   LDA #$25				;
 
 CODE_D444:  
-   STA $2D                  
-   BNE CODE_D3EA
+   STA $2D				;
+   BNE CODE_D3EA			;enable display and return
    
 CODE_D448:
-   LDA $2D                  
-   BNE CODE_D450
+   LDA $2D				;wait for the timer
+   BNE CODE_D450			;
    
-   LDA #$00                 
-   STA $50
+   LDA #$00				;reset pointer (used by title demo, i think)
+   STA $50				;
 
-CODE_D450:   
-   RTS
+CODE_D450:
+   RTS					;
    
 CODE_D451:
    LDA $2D                  
