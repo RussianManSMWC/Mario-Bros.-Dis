@@ -912,8 +912,8 @@ CODE_C4AE:
    RTS
    
 CODE_C4B8:
-   LDA DemoFlag					;\demo does things differently
-   BNE CODE_C528				;/
+   LDA DemoFlag					;\if it's title screen and demo time
+   BNE CODE_C528				;/don't run gameplay (or do, but from different pointers)
    
    LDA $18					;\if start button is pressed, start game
    AND #$10					;|
@@ -994,7 +994,6 @@ DATA_C510:
    .dw CODE_D45C				;unpause
    .dw CODE_E28B				;game over
 
-;Code related with Demo recording.
 CODE_C528:
    LDA $18					;
    AND #$30					;
@@ -1018,47 +1017,47 @@ CODE_C543:
    BEQ CODE_C58E				;/don't check things
    CMP #$20                 			;\check if pressed select
    BNE CODE_C568                		;/
-   CPX #$01                 			;\if it was pressed when on title screen, move cursor
-   BNE CODE_C561				;/
+   CPX #$01                 			;\if select was pressed, but it's not a title screen
+   BNE CODE_C561				;/return to title screen
    
-   LDA $28
-   BNE CODE_C574
+   LDA $28					;don't repeatidly move cursor (if holding select)
+   BNE CODE_C574				;
    
-   LDY $29                  
-   INY
-   CPY #$04                 
-   BNE CODE_C55C
+   LDY $29					;move cursor 
+   INY						;
+   CPY #$04                 			;
+   BNE CODE_C55C				;
 
-   LDY #$00
+   LDY #$00					;if cursor was on last entry, wrap around
    
-CODE_C55C:   
-   STY $29                  
-   JMP CODE_C570
+CODE_C55C:
+   STY $29					;cursor's position
+   JMP CODE_C570				;
 
 CODE_C561:
-   JSR CODE_D4FE
+   JSR CODE_D4FE				;mute sounds (not that they play during demo anyways...)
    
-   STA $50                  
-   BEQ CODE_C58E
+   STA $50					;initialize title screen
+   BEQ CODE_C58E				;
 
 CODE_C568:   
-   CMP #$00       
-   BNE CODE_C570 
+   CMP #$00					;if we pressed select
+   BNE CODE_C570				;move only once per press
    
-   STA $28                  
-   BEQ CODE_C57E
+   STA $28					;if not holding/pressing select anymore, can move again
+   BEQ CODE_C57E				;
 
 CODE_C570:  
-   LDA #$01                 
-   STA $28
+   LDA #$01					;can't move cursor
+   STA $28					;
    
 CODE_C574:
-   LDA $2D                  
-   CMP #$25                 
-   BCS CODE_C57E
+   LDA $2D					;keep timer if moving cursor
+   CMP #$25					;(when song plays out)
+   BCS CODE_C57E				;
    
-   LDA #$25                 
-   STA $2D
+   LDA #$25					;keep timer
+   STA $2D					;
 
 CODE_C57E:   
    CPX #$01					;\don't handle cursor if it's not title screen
@@ -1077,11 +1076,13 @@ CODE_C58E:
    LDA $50  					;\Set up pointers based on $50 value                
    JSR CODE_CD9E				;/
 
+;Title screen and demo pointers
+;those run untill we press start to start game
 DATA_C593:
    .dw CODE_D40B				;loading title screen
    .dw CODE_D47D				;title screen
-   .dw CODE_D491				;initialize gameplay
-   .dw CODE_D496				;preparing gameplay area
+   .dw CODE_D491				;initialize demo
+   .dw CODE_D496				;build phase (and more initialization)
    .dw CODE_D49B				;same as before?
    .dw CODE_D4A0				;enable screen display
    .dw CODE_D4AF				;playing title screen demo recording (or actual gameplay?)
@@ -2702,7 +2703,7 @@ CODE_CDB4:
 ;$01 - Table location in ROM, high byte
 ;$09 - contains previously enabled bits of $2000
 ;PPU registers:
-;$2000, $2002, $2005, $2006, $2007
+;$2000, $2002, $2006, $2007
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 CODE_CDC4:				;
@@ -3913,7 +3914,7 @@ CODE_D3C6:
    STA $FD                  
    
 CODE_D3EA:
-   JMP CODE_E13D    
+   JMP CODE_E13D			;enable display
 
  CODE_D3ED:
    LDA #$02
@@ -3963,29 +3964,29 @@ CODE_D40B:
    
    INC $50				;next pointer
    
-   LDY $52				;set-up timer for... something?
-   BNE CODE_D440			;needs investigation
+   LDY $52				;if it shouldn't play title screen song (or again, after demo ends)
+   BNE CODE_D440			;wait for next time
    
-   LDY #$02				;
+   LDY #$02				;don't play music after demo plays a coupld of times
    STY $52				;
    
-   LDA #$4F				;
+   LDA #$4F				;play music
    BNE CODE_D444			;
   
 CODE_D440:
    DEC $52				;
    
-   LDA #$25				;
+   LDA #$25				;shorter time, because no song
 
 CODE_D444:  
    STA $2D				;
    BNE CODE_D3EA			;enable display and return
    
 CODE_D448:
-   LDA $2D				;wait for the timer
+   LDA $2D				;wait for the timer to run out
    BNE CODE_D450			;
    
-   LDA #$00				;reset pointer (used by title demo, i think)
+   LDA #$00				;reset pointer, initialize title screen
    STA $50				;
 
 CODE_D450:
@@ -4031,31 +4032,31 @@ CODE_D47C:
    RTS
 
 CODE_D47D:   
-   LDY $2D                  
-   BEQ CODE_D48E                
-   CPY #$4B                 
-   BNE CODE_D48D
+   LDY $2D				;if timer ran out, play demo
+   BEQ CODE_D48E			;
+   CPY #$4B				;if it should play title screen music (after reset/after demo plays a couple of times), well
+   BNE CODE_D48D			;
    
-   LDA #$80                 
-   STA $FD
+   LDA #$80				;queue title screen music
+   STA $FD				;
 
-   LDY #$48                 
-   STY $2D
+   LDY #$48				;and set timer, huh?
+   STY $2D				;
    
 CODE_D48D:
-   RTS                      
+   RTS					;
 
 CODE_D48E:
-   INC $50
-   RTS
+   INC $50				;
+   RTS					;
    
 CODE_D491:
-   INC $50                  
-   JMP CODE_D34A
+   INC $50				;next pointer
+   JMP CODE_D34A			;jump to existing pointer used during actual gameplay (initialize some variables)
 
 CODE_D496:   
-   INC $50
-   JMP CODE_E14A
+   INC $50				;next pointer
+   JMP CODE_E14A			;used by gameplay pointer as well, build phase
    
 CODE_D49B:
    INC $50
