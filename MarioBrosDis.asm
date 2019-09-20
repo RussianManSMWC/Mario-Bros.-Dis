@@ -46,7 +46,7 @@ vblankloop:
    DEX							;\
    TXS							;/iniria;ize stack
    
-   LDX $70						;why this is needed?
+   LDX PowHitsLeft					;load POW-block state for RNG setup
    
    LDY #$06						;set up RAM clearing loop
    STY $01						;
@@ -65,12 +65,13 @@ ResetLoop:
    DEC $01						;
    BPL ResetLoop					;we set reset loop by setting high and low bytes for inderect adressing, and decrease high byte
    
-   TXA							;I still have no idea
+   TXA							;if POW block is non-existant (hit three time)
    BNE CODE_C02B					;
-   LDX #$5F						;
+   LDX #$5F						;start "RNG" loop at $5F
 
 CODE_C02B:
-   STX $0500						;
+   STX $0500						;otherwise it starts at 1, 2 or 3 depending on POW block state before reset
+   
    JSR CODE_CA1B					;clear screen(s)
    JSR CODE_CA2B					;"clear" sprite data
    
@@ -2521,56 +2522,56 @@ CODE_CCFE:
    RTS					;
    
 CODE_CCFF:
-   LDA $21
-   BEQ CODE_CD42
+   LDA $21				;flag for tile update
+   BEQ CODE_CD42			;obviously don't do that if not set
    
-   LDA #$91
-   STA $00
+   LDA #$91				;set buffer address as indirect address
+   STA $00				;
    
-   LDA #$05
-   STA $01
+   LDA #$05				;$0591
+   STA $01				;
    
    LDA $09				; 
-   AND #$FB				;
-   STA $2000				;enable any of bits except for bits 0 and 1
+   AND #$FB				;enable any of bits except for bits 0 and 1
+   STA $2000				;(which are related with nametables)
    STA $09				;back them up
    
-   LDX $2002
+   LDX $2002				;prepare for PPU drawing
    
-   LDY #$00
-   BEQ CODE_CD34
+   LDY #$00				;initialize Y register
+   BEQ CODE_CD34			;jump ahead
 
 CODE_CD1B:
-   STA $2006
+   STA $2006				;set tile drawing position, high byte
    
-   INY
-   LDA ($00),y
-   STA $2006
+   INY					;low byte
+   LDA ($00),y				;
+   STA $2006				;
    
-   INY
-   LDA ($00),y
-   AND #$3F
-   TAX
+   INY					;
+   LDA ($00),y				;
+   AND #$3F				;
+   TAX					;set how many tiles to draw on a single line
    
 CODE_CD2A:
-   INY
-   LDA ($00),y
-   STA $2007
-   DEX
-   BNE CODE_CD2A
-   INY
+   INY					;
+   LDA ($00),y				;now, tiles
+   STA $2007				;
+   DEX					;
+   BNE CODE_CD2A			;draw untill the end
+   INY					;
 
 CODE_CD34:
-   LDA ($00),y
-   BNE CODE_CD1B
+   LDA ($00),y				;if it transferred all tile data from buffer addresses by hitting address with 0, return
+   BNE CODE_CD1B			;loop if must
    
-   LDA #$00
-   STA $0590
-   STA $0591
-   STA $21
+   LDA #$00				;
+   STA $0590				;
+   STA $0591				;
+   STA $21				;end draw, reset flag
 
 CODE_CD42:
-   RTS
+   RTS					;
    
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Fill screen routine
@@ -2793,7 +2794,7 @@ CODE_CE23:
    RTS					;
    
 CODE_CE2C:
-   LDA #$01                 
+   LDA #$01				;enable drawing for bump tiles/POW tiles (in NMI)
    STA $21
    
    LDY #$00
@@ -4241,35 +4242,35 @@ CODE_D58C:
    JMP CODE_D5D5                
    
 CODE_D593:
-   LDA $70                  
-   ASL A                    
-   ASL A                    
-   CLC                      
-   ADC $70                  
-   STA $12
+   LDA PowHitsLeft			;POW hits
+   ASL A				;
+   ASL A				;
+   CLC					;*5
+   ADC PowHitsLeft			;
+   STA $12				;store here
    
-   LDA #$00                 
-   STA $13
+   LDA #$00				;
+   STA $13				;
    
-   LDA #$60                 
-   STA $14
+   LDA #$60				;
+   STA $14				;
    
-   LDA #$F5                 
-   STA $15                  
-   JSR CODE_CDB4
+   LDA #$F5				;
+   STA $15				;some table set-up, i believe
+   JSR CODE_CDB4			;do some calculation
    
-   LDA #$AF                 
-   STA $00
+   LDA #$AF				;more set-up
+   STA $00				;
    
-   LDA #$22
-   STA $01   
+   LDA #$22				;
+   STA $01				;
    
-   LDA $14                  
-   STA $02        
+   LDA $14				;transfer for indirect addressing
+   STA $02				;
    
-   LDA $15                  
-   STA $03                  
-   JMP CODE_CE2C                
+   LDA $15				;
+   STA $03				;
+   JMP CODE_CE2C			;
 
 CODE_D5BE:
    LDX #$60                 
