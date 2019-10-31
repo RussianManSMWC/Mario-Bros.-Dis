@@ -9080,8 +9080,9 @@ DATA_F276:
 DATA_F286:
 .db $23,$D0,$58,$FF,$23,$E8,$08,$5F
 .db $FF,$FF,$00,$00,$FF,$FF,$5F,$00
-.db $A6,$F2,$B9,$F2,$C6,$F2
 
+DATA_F296:
+.db $A6,$F2,$B9,$F2,$C6,$F2
 .db $C6,$F2,$D0,$F2,$DA,$F2,$E1,$F2
 .db $E8,$F2,$00,$EF,$F8,$00,$EF,$00
 .db $00,$F7,$F8,$00,$F7,$00,$00,$00
@@ -9293,6 +9294,8 @@ DATA_F671:
 .db $F4,$DF,$01,$C0				;/
 
 ;Title screen cursor OAM data, same format as above, Y-position is also overwritten.
+
+DATA_F689:
 .db $F4,$EE,$00,$38
 
 DATA_F68D:
