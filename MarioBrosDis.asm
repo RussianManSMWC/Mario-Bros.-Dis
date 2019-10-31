@@ -1180,7 +1180,7 @@ CODE_C636:
    JSR CODE_C0B6
    
 CODE_C63F:
-   LDA $05FD                
+   LDA $05FD
    BEQ CODE_C647
    
    JSR CODE_CAB9
@@ -1361,7 +1361,7 @@ CODE_C744:
 CODE_C747:  
    JSR CODE_CBC4
    
-   LDA $B0                  
+   LDA $B0
    BEQ CODE_C758
    
    LDA $C9                  
@@ -1517,10 +1517,10 @@ CODE_C7F9:
    ORA #$80                 
    STA $B1
    
-   LDA #$50                 
+   LDA #<DATA_F350			;$50                 
    STA $BC
    
-   LDA #$F3                 
+   LDA #>DATA_F350			;$F3                 
    STA $BD
    
    LDA #$18                 
@@ -1796,7 +1796,7 @@ CODE_C973:
    JSR CODE_CF67
    
    LDA #$2C                 
-   LDY #$F3                 
+   LDY #$F3
    JMP CODE_C992
   
 CODE_C97D:
@@ -1965,27 +1965,27 @@ CODE_CA35:
    RTS					;/
 
 CODE_CA3B:
-   LDA #$3F
-   LDX #$F2                 
+   LDA #<DATA_F23F			;$3F
+   LDX #>DATA_F23F			;$F2                 
    JSR CODE_CA5E
    
-   LDA #$66                 
-   LDX #$F2
+   LDA #<DATA_F266			;$66                 
+   LDX #>DATA_F266			;$F2
    LDY $32                  
    BEQ CODE_CA5E                
    CPY #$04                 
    BEQ CODE_CA5E
    
-   LDA #$76                 
-   LDX #$F2                 
+   LDA #<DATA_F276			;$76                 
+   LDX #>DATA_F276			;$F2                 
    CPY #$01                 
    BEQ CODE_CA5E
-   CPY #$03                 
+   CPY #$03
    BEQ CODE_CA5E
    
-   LDA #$86                 
-   LDX #$F2
-   
+   LDA #<DATA_F286			;$86                 
+   LDX #>DATA_F286			;$F2
+
 CODE_CA5E:
    STA $00
    STX $01
@@ -2000,13 +2000,13 @@ CODE_CA66:
    DEY				;check if supposed to load gameplay palette
    BEQ CODE_CA73		;do so if set, otherwise set palette for title screen
    
-   LDA #$27			;Setup address to read data from (DATA_F227)
-   LDX #$F2			;
+   LDA #<DATA_F227		;Setup address to read data from (DATA_F227)
+   LDX #>DATA_F227		;
    BNE CODE_CA77		;
 
 CODE_CA73:
-   LDA #$03			;setup different data address to read from (DATA_F203)
-   LDX #$F2			;
+   LDA #<DATA_F203		;setup different data address to read from (DATA_F203)
+   LDX #>DATA_F203		;
    
 CODE_CA77:
    LDY #$00			;
@@ -2061,10 +2061,10 @@ CODE_CAB6:
    RTS
    
 CODE_CAB9:
-   LDA #$93     
+   LDA #<DATA_F393			;$93     
    STA $14
    
-   LDA #$F3                 
+   LDA #>DATA_F393			;$F3
    STA $15
    
    LDA $C3                  
@@ -2279,10 +2279,10 @@ CODE_CBC4:
    LDA $B0                  
    BEQ CODE_CBC3
    
-   LDA #$F2                 
+   LDA #>DATA_F296           
    STA $15
    
-   LDA #$96                 
+   LDA #<DATA_F296            
    STA $14
 
    LDA $B5                  
@@ -2961,10 +2961,10 @@ CODE_CEEF:
 CODE_CF04:   
    STA $35
    
-   LDA #$52                      
+   LDA #<DATA_F452			;$52                      
    STA $14
    
-   LDA #$F4            
+   LDA #>DATA_F452			;$F4            
    STA $15
    
    LDA $1E                  
@@ -3953,10 +3953,10 @@ CODE_D40B:
    LDA #$01				;makes cursor move when select is pressed (not held)
    STA $28				;
    
-   LDA #$89				;setup for cursor sprite
+   LDA #<DATA_F689			;setup for cursor sprite
    STA $00				;
    
-   LDA #$F6				;set-up location to get cursor's OAM data
+   LDA #>DATA_F689			;set-up location to get cursor's OAM data
    STA $01				;it's DATA_F689
    
    LDA #$04				;4 bytes to transfer
@@ -4237,8 +4237,8 @@ CODE_D58B:
    RTS
 
 CODE_D58C:
-   LDX #$F5                 
-   LDY #$F4                 
+   LDX #<DATA_F4F5			;$F5                 
+   LDY #>DATA_F4F5			;$F4                 
    JMP CODE_D5D5                
    
 CODE_D593:
@@ -4251,11 +4251,11 @@ CODE_D593:
    
    LDA #$00				;
    STA $13				;
-   
-   LDA #$60				;
+
+   LDA #<DATA_F560			;
    STA $14				;
    
-   LDA #$F5				;
+   LDA #>DATA_F560			;
    STA $15				;some table set-up, i believe
    JSR CODE_CDB4			;do some calculation
    
@@ -4286,8 +4286,8 @@ CODE_D5BE:
    LDA #$01                 
    STA $9E
    
-   LDX #$6B                 
-   LDY #$F6                 
+   LDX #<DATA_F66B			;$6B
+   LDY #>DATA_F66B			;$F6
    
 CODE_D5D5:
    STX $00                  
@@ -4421,8 +4421,8 @@ CODE_D63C:
    LDA #$F0                 
    STA $04F0
    
-   LDX #$35                 
-   LDY #$F7                 
+   LDX #<DATA_F735			;$35
+   LDY #>DATA_F735			;$F7
    JMP CODE_D5D5                
    
 CODE_D672:
@@ -4459,10 +4459,10 @@ CODE_D68F:
    RTS                      
  
 CODE_D69A:
-   LDA #$BA                 
+   LDA #<DATA_F3BA
    STA $14
    
-   LDA #$F3                 
+   LDA #>DATA_F3BA
    STA $15
    
    LDA $34                  
@@ -4489,28 +4489,28 @@ CODE_D6BA:
    BNE CODE_D710
    
    LDA $BF                  
-   LDX #$84                 
-   LDY #$F5                 
+   LDX #<DATA_F584			;$84                 
+   LDY #>DATA_F584			;$F5                 
    CMP #$10
    BEQ CODE_D6E6
    
-   LDX #$8C                 
-   LDY #$F5                 
+   LDX #<DATA_F58C			;$8C                 
+   LDY #>DATA_F58C			;$F5                 
    CMP #$20                 
    BEQ CODE_D6E6
    
-   LDX #$96                 
-   LDY #$F5                 
+   LDX #<DATA_F596			;$96                 
+   LDY #>DATA_F596			;$F5                 
    CMP #$30                 
    BEQ CODE_D6E6
    
-   LDX #$9E                 
-   LDY #$F5                 
+   LDX #<DATA_F59E			;$9E                 
+   LDY #>DATA_F59E			;$F5                 
    CMP #$80                 
    BEQ CODE_D6E6
    
-   LDX #$A4                 
-   LDY #$F5
+   LDX #<DATA_F5A4			;$A4                 
+   LDY #>DATA_F5A4			;$F5
   
 CODE_D6E6:
    STX $06                  
@@ -4613,8 +4613,8 @@ CODE_D767:
    STA $FE
    
    LDA #$F4                 
-   STA $02B0                
-   STA $02B4                
+   STA $02B0				;something to do with OAM
+   STA $02B4				;(hide 2 sprite tiles)
    BNE CODE_D785
 
 CODE_D77F:  
@@ -5124,8 +5124,8 @@ CODE_DA24:
    ORA #$80                 
    STA $B1
    
-   LDA #$4D                 
-   LDY #$F6                 
+   LDA #<DATA_F64D			;$4D                 
+   LDY #>DATA_F64D			;$F6 
    LDX #$03                 
    BNE CODE_DA46                
 
@@ -5144,8 +5144,8 @@ CODE_DA3C:
    BCC CODE_DA3B
    
 CODE_DA40:
-   LDA #$43                 
-   LDY #$F6                 
+   LDA #<DATA_F643			;$43                 
+   LDY #>DATA_F643			;$F6                 
    LDX #$02                 
 
 CODE_DA46:
@@ -5205,13 +5205,13 @@ CODE_DA7E:
    CMP #$30                 
    BNE CODE_DAC0
    
-   LDA #$7B                 
-   LDY #$F3                 
+   LDA #<DATA_F37B			;$7B                 
+   LDY #>DATA_F37B			;$F3                 
    STA $BC                  
    STY $BD
    
    LDA $B1                  
-   AND #$3F                 
+   AND #$3F
    ORA #$40                 
    STA $B1                  
    RTS
@@ -5264,24 +5264,24 @@ CODE_DAE3:
    CPY #$E8                 
    BCC CODE_DAC0
    
-   LDA #$F0                 
+   LDA #$F0				;thought this may relate to inderect addressing table setup, but i'm not sure. Hmm...
    STA $B9
    
    LDA $05FC                
-   BNE CODE_DB19                
+   BNE CODE_DB19
    JSR CODE_DFD3
    
    LDA #$01                 
    STA $05FC
    
-   LDA #$D8                 
+   LDA #$D8
    LDY #$02
   
 CODE_DAFC:
    STA $B9                  
    STY $B1
    
-   LDA #$2C                 
+   LDA #$2C
    STA $B8                  
    TYA   
    ORA #$80                 
@@ -5448,7 +5448,7 @@ CODE_DBC6:
    BNE CODE_DBFE
   
 CODE_DBE2:
-   LDA $C9                  
+   LDA $C9    
    BNE CODE_DBFE
    
    LDY #$01                 
@@ -5499,7 +5499,7 @@ CODE_DC1F:
    CLC                      
    ADC $1E                  
    TAY                      
-   LDA DATA_F626,Y              
+   LDA DATA_F626,Y
    CMP #$01                 
    BEQ CODE_DC3B                
    CMP #$FF                 
@@ -5540,10 +5540,10 @@ CODE_DC55:
    CPX #$01                 
    BNE CODE_DC6E
    
-   LDA #$7B                 
+   LDA #<DATA_F37B			;$7B                 
    STA $BC
    
-   LDA #$F3                 
+   LDA #>DATA_F37B			;$F3                 
    STA $BD
    
    LDA $B1                  
@@ -5578,7 +5578,7 @@ CODE_DC86:
    
    JSR CODE_C446                
    STA $1E                  
-   ORA #$00                 
+   ORA #$00
    BNE CODE_DC92
 
 CODE_DC91:
@@ -5663,8 +5663,8 @@ CODE_DCEA:
    LDA #$00                 
    STA $B5
    
-   LDA #$A9                 
-   LDY #$F6                 
+   LDA #<DATA_F6A9			;$A9                 
+   LDY #>DATA_F6A9			;$F6                 
    STA $BC                  
    STY $BD
    
@@ -6140,7 +6140,7 @@ CODE_DF72:
   
 CODE_DF75:
    LDA #$00                 
-   STA $C6                  
+   STA $C6
    STA $B3
 
    JSR CODE_DFB0
@@ -6252,8 +6252,8 @@ CODE_DFF8:
    LDA $04C5                
    BNE CODE_DFF7
    
-   LDX #$A8                 
-   LDY #$E0                 
+   LDX #<DATA_E0A8			;$A8                 
+   LDY #>DATA_E0A8			;$E0                 
    LDA $04F0                
    BEQ CODE_E00F
    
@@ -6275,8 +6275,8 @@ CODE_E00F:
    BNE CODE_E051
   
 CODE_E023:
-   LDX #$88                 
-   LDY #$E0                 
+   LDX #<DATA_E088			;$88                 
+   LDY #>DATA_E088			;$E0                 
    LDA $49
    BEQ CODE_E058
    
@@ -6289,8 +6289,8 @@ CODE_E023:
    LDA $4E                  
    BNE CODE_E03C
    
-   LDX #$78                 
-   LDY #$E0
+   LDX #<DATA_E078			;$78                 
+   LDY #>DATA_E078			;$E0
   
 CODE_E03C:
    LDA #$00                 
@@ -6328,8 +6328,8 @@ CODE_E058:
    LDA $4A                  
    BNE CODE_E06D
    
-   LDX #$98                 
-   LDY #$E0
+   LDX #<DATA_E098			;$98
+   LDY #>DATA_E098			;$E0
 
 CODE_E06D:  
    LDA #$00                 
@@ -6345,10 +6345,16 @@ CODE_E077:
 DATA_E078:
 .db $1F,$16,$0A,$1B,$12,$18,$24,$10
 .db $0A,$16,$0E,$24,$18,$1F,$0E,$1B
+
+DATA_E088:
 .db $1F,$24,$24,$24,$10,$0A,$16,$0E
 .db $24,$18,$1F,$0E,$1B,$24,$24,$24
+
+DATA_E098:
 .db $1F,$15,$1E,$12,$10,$12,$24,$10
 .db $0A,$16,$0E,$24,$18,$1F,$0E,$1B
+
+DATA_E0A8:
 .db $1F,$24,$24,$24,$24,$24,$24,$24
 .db $24,$24,$24,$24,$24,$24,$24,$24
 
@@ -6544,7 +6550,9 @@ CODE_E1F4:
    STA $40
 
 CODE_E1F6:   
-   RTS                      
+   RTS
+   
+ ;CONTINUE CHECKING FOR INDIRECTS FROM HERE!!!
    
 CODE_E1F7:
    LDA $21                  
@@ -9059,13 +9067,17 @@ DATA_F23F:
 .db $50,$00,$00,$55,$55,$00,$00,$00
 .db $00,$55,$55,$23,$F0,$10,$F5,$FF
 .db $FF,$FF,$FF,$FF,$FF,$F5,$FF,$FF
-.db $FF,$FF,$FF,$FF,$FF,$FF,$00,$23
-.db $D0,$58,$00,$23,$E8,$08,$50,$00
-.db $00,$00,$00,$00,$00,$50,$00
+.db $FF,$FF,$FF,$FF,$FF,$FF,$00
+
+DATA_F266:
+.db $23,$D0,$58,$00,$23,$E8,$08,$50
+.db $00,$00,$00,$00,$00,$00,$50,$00
 
 DATA_F276:
 .db $23,$D0,$58,$AA,$23,$E8,$08,$5A
 .db $AA,$AA,$00,$00,$AA,$AA,$5A,$00
+
+DATA_F286:
 .db $23,$D0,$58,$FF,$23,$E8,$08,$5F
 .db $FF,$FF,$00,$00,$FF,$FF,$5F,$00
 .db $A6,$F2,$B9,$F2,$C6,$F2
@@ -9094,7 +9106,10 @@ DATA_F2EC:
 .db $00,$00,$00,$00,$00,$00,$01,$00
 .db $01,$00,$01,$01,$00,$01,$01,$02
 .db $01,$02,$02,$02,$02,$02,$02,$03
-.db $03,$03,$03,$AA,$FC,$FC,$FC,$FC
+.db $03,$03,$03,$AA
+
+DATA_F350:
+.db $FC,$FC,$FC,$FC
 .db $FC,$FC,$FC,$FD,$FD,$FE,$FE,$FE
 .db $FE,$FE,$FE,$FF,$FE,$FF,$FF,$FF
 .db $00,$FF,$FF,$00,$FF,$00,$00,$00
@@ -9102,14 +9117,19 @@ DATA_F2EC:
 .db $FF,$00,$FF,$00,$FF,$00,$AA,$00
 .db $01,$00,$01,$00,$01,$01,$01,$02
 .db $01,$01,$02,$03,$03,$04,$04,$CC
-.db $04,$CC,$CC,$CC,$04,$CC,$AA,$01
-.db $03,$00,$01,$02,$00,$01,$01,$00
-.db $AA,$01,$03,$00,$01,$02,$00,$01
-.db $01,$FF,$AA
+.db $04,$CC,$CC,$CC,$04,$CC,$AA
+
+DATA_F393:
+.db $01,$03,$00,$01,$02,$00,$01,$01
+.db $00,$AA,$01,$03,$00,$01,$02,$00
+.db $01,$01,$FF,$AA
 
 .db $01,$02,$00,$01,$01,$FF,$01,$01
 .db $FF,$01,$01,$00,$01,$01,$00,$01
-.db $01,$01,$AA,$D2,$F3,$D9,$F3,$E4
+.db $01,$01,$AA
+
+DATA_F3BA:
+.db $D2,$F3,$D9,$F3,$E4
 .db $F3,$ED,$F3,$FA,$F3,$03,$F4,$0E
 .db $F4,$19,$F4,$24,$F4,$31,$F4,$3E
 .db $F4,$49,$F4,$05,$00,$12,$00,$1F
@@ -9117,7 +9137,10 @@ DATA_F2EC:
 .db $19,$00,$1F,$00,$AA,$05,$01,$0C
 .db $01,$2B,$01,$0C,$01,$AA,$03,$01
 .db $0C,$01,$31,$00,$06,$00,$49,$01
-.db $07,$01,$AA,$0C,$02,$0C,$02,$31
+.db $07,$01,$AA,$0C
+
+DATA_F37B:
+.db $02,$0C,$02,$31
 .db $02,$0C,$02,$AA,$0C,$02,$0C,$02
 .db $31,$01,$06,$01,$31,$02,$AA,$03
 .db $00,$0C,$00,$31,$02,$06,$00,$31
@@ -9128,8 +9151,9 @@ DATA_F2EC:
 .db $06,$02,$31,$02,$12,$01,$AA,$03
 .db $00,$0C,$00,$31,$01,$06,$00,$06
 .db $00,$AA,$01,$00,$05,$00,$40,$00
-.db $FF,$00,$AA                  
-   
+.db $FF,$00,$AA
+
+DATA_F452:
 .db $01,$00,$03,$00,$0A,$06,$52,$21
 .db $28,$00,$00,$00,$4C,$F6,$00,$10
 .db $00,$00,$00,$0A,$00,$01,$00,$00
@@ -9152,11 +9176,15 @@ DATA_F4B2:
 .db $D6,$D6,$FF,$1A,$7D,$7D,$80,$80
 .db $83,$83,$FF,$24,$A1,$A3,$A5,$A7
 .db $A9,$FF,$2C,$8C,$8E,$90,$FF,$33
-.db $B4,$B8,$BC,$FF,$38
+.db $B4,$B8,$BC
 
+.db $FF,$38					;unused?
 
 DATA_F4EF:
-.db $92,$93,$94,$95,$FF,$3D,$20,$82
+.db $92,$93,$94,$95,$FF,$3D
+
+DATA_F4F5:
+.db $20,$82
 .db $04,$52,$51,$3C,$50,$20,$A0,$06
 .db $41,$57,$56,$55,$47,$54,$20,$C0
 .db $06,$46,$5C,$5B,$5A,$4C,$59,$20
@@ -9170,21 +9198,43 @@ DATA_F4EF:
 .db $4B,$4B,$61,$22,$FC,$04,$40,$41
 .db $41,$41,$23,$1C,$04,$45,$46,$46
 .db $46,$23,$3C,$04,$4A,$4B,$4B,$4B
-.db $00,$22,$24,$24,$24,$24,$22,$FE
-.db $FF,$90,$91,$22,$FC,$FD,$8E,$8F
-.db $22,$FA,$FB,$8C,$8D  
+.db $00,$22,$24,$24,$24,$24,$22
 
+DATA_F560:
+.db $FE,$FF,$90,$91,$22,$FC,$FD,$8E
+.db $8F,$22,$FA,$FB,$8C,$8D
+ 
 DATA_F574:
 .db $2D
 
 DATA_F575:
 .db $21,$F7,$21,$03,$22,$AB,$22,$32
-.db $21,$E8,$21,$1C,$22,$B4,$22,$AA
-.db $F5,$CA,$F5,$58,$06,$52,$06,$AA
-.db $F5,$EA,$F5,$D0,$03,$6C,$03,$D9
-.db $04,$BD,$F5,$08,$F6,$E0,$04,$7D
-.db $03,$0F,$F7,$00,$00    
-.db $E8,$04,$E8,$F6,$00,$00
+.db $21,$E8,$21,$1C,$22,$B4,$22
+
+DATA_F584:
+.db $AA,$F5,$CA,$F5,$58,$06,$52,$06
+
+DATA_F58C:
+.db $AA,$F5,$EA,$F5,$D0,$03,$6C,$03
+.db $D9,$04
+
+DATA_F596:
+.db $BD,$F5,$08,$F6,$E0,$04,$7D,$03
+
+DATA_F59E:
+.db $0F,$F7
+
+;unused?
+.db $00,$00
+
+.db $E8,$04
+
+DATA_F5A4:
+.db $E8,$F6
+
+;unused?
+.db $00,$00
+
 .db $46,$07,$FD,$FE,$FE,$FE,$FE,$FF
 .db $FF,$FF,$FE,$00,$FF,$00,$FE,$00
 .db $FF,$00,$00,$00,$99,$FE,$FE,$FE
@@ -9209,13 +9259,20 @@ DATA_F626:
    
 DATA_F638:
 .db $01,$02,$03,$FF,$02,$01,$03,$FF
-.db $00,$03,$FF,$FB,$FB,$FD,$FE,$FE
-.db $FF,$FF,$FF,$FF,$AA,$F7,$F8,$FA
-.db $FB,$FC,$FD,$FE,$FE,$FE,$FE,$FE
-.db $FF,$FF,$00,$FF,$00,$00,$FF,$AA
-.db $20,$63,$01,$2A,$20,$6B,$03,$2B
-.db $2C,$2D,$00,$20,$75,$02,$29,$2A
-.db $00
+.db $00,$03,$FF
+
+DATA_F643:
+.db $FB,$FB,$FD,$FE,$FE,$FF,$FF,$FF
+.db $FF,$AA
+
+DATA_F64D:
+.db $F7,$F8,$FA,$FB,$FC,$FD,$FE,$FE
+.db $FE,$FE,$FE,$FF,$FF,$00,$FF,$00
+.db $00,$FF,$AA,$20,$63,$01,$2A,$20
+.db $6B,$03,$2B,$2C,$2D,$00
+
+DATA_F66B:
+.db $20,$75,$02,$29,$2A,$00
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;DATA_F671 - Life display OAM data
@@ -9245,6 +9302,8 @@ DATA_F68D:
 DATA_F699:
 .db $10,$CD,$03,$6C,$10,$CD,$43,$73
 .db $10,$CD,$03,$84,$10,$CD,$43,$8B
+
+DATA_F6A9:
 .db $FD,$FE,$FE,$FE,$FF,$FF,$00,$FF
 .db $00,$FF,$00,$FF,$00,$00,$00,$00
 .db $00,$00,$01,$00,$01,$00,$01,$00
@@ -9267,7 +9326,10 @@ DATA_F6C8:
 DATA_F722:
 .db $22,$4C,$08,$19,$11,$0A,$1C,$0E
 .db $24,$24,$24,$23,$41,$04,$19,$2E
-.db $24,$24,$00,$21,$89,$0F,$1D,$0E
+.db $24,$24,$00
+
+DATA_F735:
+.db $21,$89,$0F,$1D,$0E
 .db $1C,$1D,$24,$22,$18,$1E,$1B,$24
 .db $1C,$14,$12,$15,$15,$20,$8D,$06
 .db $30,$31,$31,$31,$31,$32,$20,$AD
