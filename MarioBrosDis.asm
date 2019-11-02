@@ -4847,39 +4847,40 @@ CODE_D8C0:
 
   
 CODE_D8C1:  
-   LDA $04B0                
+   LDA $04B0
    BNE CODE_D904
    
    LDA $51                  
    BNE CODE_D904
 
-   LDA $B8                  
+   LDA $B8				;Y-position for currently processed entity?
    CLC                      
    ADC #$0B                 
    TAX
 
-   LDY $B9
+   LDY $B9				;X-position for currently processed entity?
 
-   LDA $CC                  
+   LDA $CC				;currently processed player?
    STA $11
    
-   LDA $BF                  
+   LDA $BF
    CMP #$80                 
    BEQ CODE_D8E5
    
-   LDA #$00                 
-   JSR CODE_EEE3        
+   LDA #$00				;spawn score 800 for collected coin
+   JSR CODE_EEE3
    
-   LDY #$08
+   LDY #$08				;add 800 to score counter
    BNE CODE_D8F1
   
 CODE_D8E5:
-   LDA #$05                 
-   JSR CODE_EEE3                
+   LDA #$05				;spawn score 500 for freezie defeat
+   JSR CODE_EEE3
+   
    LDA #$00                 
    STA $04C1
    
-   LDY #$05
+   LDY #$05				;add 500 to score counter
 
 CODE_D8F1:  
    STY $00
@@ -5784,16 +5785,16 @@ CODE_DD9A:
    TAX                      
    INY                      
    LDA ($14),Y              
-   TAY                      
-   LDA $1F                  
-   JSR CODE_EEE3
+   TAY
+   LDA $1F
+   JSR CODE_EEE3				;spawn score based on kill combo
    
-   LDX $1F                  
-   LDA DATA_DDB0,X              
-   JMP CODE_DDB6
+   LDX $1F					;and actually add score
+   LDA DATA_DDB0,X				;
+   JMP CODE_DDB6				;
 
 DATA_DDB0:
-.db $08,$16,$24,$32				;
+.db $08,$16,$24,$32				;800, 1600, 2400 and 3200 respectively.
 
    LDA #$08					;unused?
 
@@ -8719,79 +8720,82 @@ CODE_EECC:
    
    DEC $0348                
    DEC $0348                
-   RTS                      
-   
+   RTS
+
+;score sprite GFX routine
 CODE_EEE3:
-   STA $1E                  
-   TXA                      
-   SEC
-   LDX $04D5
-   BEQ CODE_EEEE                
-   SBC #$08
+   STA $1E				;save score value index.                  
+   TXA					;Y-position from X
+   SEC					;
+   LDX $04D5				;if sprite isn't in first slot, it'll be spawned higher up (weird but ok)
+   BEQ CODE_EEEE			;
+   SBC #$08				;8 pixels higher
   
 CODE_EEEE:
-   SBC #$18                 
-   STA $02E8,X              
-   STA $02EC,X              
-   TYA                      
-   SEC                      
-   SBC #$08                 
-   STA $02EB,X              
-   TYA                      
-   STA $02EF,X
+   SBC #$18				;24 pixels higher
+   STA $02E8,X				;score sprite tiles' Y-position
+   STA $02EC,X				;
+   TYA					;X-position from Y
+   SEC					;
+   SBC #$08				;first sprite tile's 8 pixels to the left
+   STA $02EB,X				;
+   TYA					;
+   STA $02EF,X				;
 
-   LDY $1E                  
-   LDA DATA_EF97,Y              
-   STA $02E9,X
+   LDY $1E				;load score value
+   LDA DATA_EF97,Y			;load respective sprite tile
+   STA $02E9,X				;
    
-   LDA #$45                 
-   STA $02ED,X              
-   LDY #$03                 
-   LDA $11                  
-   BEQ CODE_EF16                
-   LDY #$02
+   LDA #$45				;second tile is always "00"
+   STA $02ED,X				;
+   
+   LDY #$03				;
+   LDA $11				;check which player triggered score
+   BEQ CODE_EF16			;if it was Mario, set palette 3
+   LDY #$02				;otherwise it's palette 2
   
 CODE_EF16:
-   TYA                      
-   STA $02EA,X              
-   STA $02EE,X
+   TYA					;
+   STA $02EA,X				;store props
+   STA $02EE,X				;
 
-   LDX #$00                 
-   LDY #$08                 
-   LDA $04D5                
-   BEQ CODE_EF29                
-   INX                      
-   LDY #$00
+   LDX #$00				;prepare next score sprite slot? (set OAM offset)
+   LDY #$08				;
+   LDA $04D5				;
+   BEQ CODE_EF29			;
+   INX					;
+   LDY #$00				;
    
 CODE_EF29:
-   LDA #$40                 
-   STA $04D6,X              
-   STY $04D5                
+   LDA #$40
+   STA $04D6,X				;timer for score sprite's graphic to stay
+   STY $04D5
    RTS
-   
+
+;handle score sprite's display on timer.
 CODE_EF32:
    LDX #$00                 
    LDY #$00
 
 CODE_EF36:   
-   LDA $04D6,X
-   BEQ CODE_EF48
+   LDA $04D6,X				;if first score sprite's timer is zero
+   BEQ CODE_EF48			;check the other
    
-   DEC $04D6,X              
-   BNE CODE_EF48
+   DEC $04D6,X				;decrease it's timer
+   BNE CODE_EF48			;untill it's zero
    
-   LDA #$F4                 
-   STA $02E8,Y              
-   STA $02EC,Y
+   LDA #$F4				;erase sprite tiles
+   STA $02E8,y				;
+   STA $02EC,y				;
    
 CODE_EF48:
-   LDY #$08                 
-   INX                      
-   CPX #$02                 
-   BNE CODE_EF36                
+   LDY #$08				;check next score sprite (OAM offset)
+   INX					;
+   CPX #$02				;
+   BNE CODE_EF36			;loop
    RTS                      
 
-
+;related with freezie and freezing tiles (sprite tiles)
 CODE_EF50:
    LDA $04CC                
    ASL A                    
@@ -8819,12 +8823,18 @@ DATA_EF67:
 .db $A7,$8B,$43,$30,$A7,$8A,$43,$38
 .db $A7,$8A,$03,$C0,$A7,$8B,$03,$C8
 .db $A7,$8B,$43,$D0,$A7,$8A,$43,$D8
-   
+
+;Sprite tile values for each score value.
 DATA_EF97:
-.db $40,$42,$43,$44,$3E
+.db $40				;8 for 800
+.db $42				;16 for 1600
+.db $43				;24 for 2400
+.db $44				;32 for 3200
+.db $3E				;2 for 200 (unused?)
+.db $3F				;5 for 500
 
 DATA_EF9C:
-.db $3F,$9C,$00,$9D,$00,$9F,$00,$00
+.db $9C,$00,$9D,$00,$9F,$00,$00
 .db $9D,$00,$9B,$00,$00,$92,$00,$00
 .db $93,$00,$00,$94,$00,$00,$95,$00
 .db $92,$00,$93,$00,$94,$00,$FF
