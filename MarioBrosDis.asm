@@ -1968,13 +1968,14 @@ CODE_CA35:
 CODE_CA3B:
    LDA #<DATA_F23F			;$3F
    LDX #>DATA_F23F			;$F2                 
-   JSR CODE_CA5E
+   JSR CODE_CA5E			;set attributes for each phase (HUD, brick floor)
    
    LDA #<DATA_F266			;$66                 
    LDX #>DATA_F266			;$F2
-   LDY $32                  
-   BEQ CODE_CA5E                
-   CPY #$04                 
+   
+   LDY $32				;something something
+   BEQ CODE_CA5E
+   CPY #$04
    BEQ CODE_CA5E
    
    LDA #<DATA_F276			;$76                 
@@ -3931,9 +3932,9 @@ CODE_D3F5:
    BNE CODE_D3EA
    
 CODE_D3F9:
-   JSR CODE_E132        		;call NMI and enable rendering (probably (it doesn't actually))       
-   JSR CODE_CA20                
-   JSR CODE_CA2B                
+   JSR CODE_E132        		;call NMI and disable rendering    
+   JSR CODE_CA20			;clear screen
+   JSR CODE_CA2B			;remove all sprite tiles
    JSR CODE_D508                
    JSR CODE_D61D
    
@@ -4143,15 +4144,15 @@ CODE_D502:
    RTS
 
 CODE_D508:
-   JSR CODE_CA3B
+   JSR CODE_CA3B			;write attributes and stuff
    
-   LDA $32                  
-   CLC                      
-   ADC #$93                 
-   STA $07
+   LDA $32				;load ledge tile value that is used to build ledges (changes in some phases)
+   CLC					;apply offset to get correct tiles (93, 94, 95 and 96)
+   ADC #$93				;
+   STA $07				;
    
-   LDX #$00                 
-   LDY #$00                 
+   LDX #$00
+   LDY #$00
    STY $1C
 
 CODE_D518:
@@ -4159,7 +4160,7 @@ CODE_D518:
    STA $02
 
 CODE_D51C:
-   LDA DATA_F1E7,Y              
+   LDA DATA_F1E7,Y
    STA $0540,X              
    INY                      
    INX                      
@@ -9084,12 +9085,25 @@ DATA_F227:
 
 .db $00					;stop writing
 
+;General attribute setup table
+;attributes that ar written for all phases. that being HUD and brick floor. just like before, uses generic PPU write format.
+
 DATA_F23F:
-.db $23,$C0,$10,$00,$00,$C0,$30,$00
-.db $50,$00,$00,$55,$55,$00,$00,$00
-.db $00,$55,$55,$23,$F0,$10,$F5,$FF
-.db $FF,$FF,$FF,$FF,$FF,$F5,$FF,$FF
-.db $FF,$FF,$FF,$FF,$FF,$FF,$00
+.db $23,$C0				;PPU address
+
+.db $10					;16 bytes
+
+.db $00,$00,$C0,$30,$00,$50,$00,$00
+.db $55,$55,$00,$00,$00,$00,$55,$55
+
+.db $23,$F0				;another PPU address, being at the bottom of the screen, aka brick flooring
+
+.db $10					;16 bytes
+
+.db $F5,$FF,$FF,$FF,$FF,$FF,$FF,$F5
+.db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+
+.db $00					;stop write
 
 DATA_F266:
 .db $23,$D0,$58,$00,$23,$E8,$08,$50
