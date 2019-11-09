@@ -1260,8 +1260,8 @@ CODE_C697:
    LDA #$00                 
    STA $04C0
    
-   LDA #<DATA_F59E			;$9E                 
-   LDY #>DATA_F59E			;$F5                 
+   LDA #<DATA_F59E				;$9E                 
+   LDY #>DATA_F59E				;$F5                 
    BNE CODE_C6CD
 
 CODE_C6BC:  
@@ -1276,8 +1276,8 @@ CODE_C6BF:
    BNE CODE_C6E0
 
 CODE_C6C9:  
-   LDA #<DATA_F5A4			;$A4                 
-   LDY #>DATA_F5A4			;$F5
+   LDA #<DATA_F5A4				;$A4                 
+   LDY #>DATA_F5A4				;$F5
   
 CODE_C6CD:
    STA $06                  
@@ -1392,21 +1392,21 @@ CODE_C75D:
    STA $43
 
 CODE_C770:
-   LDA #$01                 
-   STA $51                  
-   RTS                      
+   LDA #$01					;phase complete
+   STA $51					;
+   RTS						;
 
 CODE_C775:
-   LDA $44                  
-   BEQ CODE_C770                
-   CMP #$01                 
-   BNE CODE_C781
+   LDA $44					;
+   BEQ CODE_C770				;if all enemies are defeated, mark phase as complete
+   CMP #$01					;if not last enemy alive
+   BNE CODE_C781				;return
    
-   LDA #$01                 
-   STA $46                  
+   LDA #$01					;mark last enemy (make them faster)
+   STA $46					;
    
 CODE_C781:
-   RTS
+   RTS						;
    
 CODE_C782:
    JMP CODE_C686                
@@ -1973,19 +1973,19 @@ CODE_CA3B:
    LDA #<DATA_F266			;$66                 
    LDX #>DATA_F266			;$F2
    
-   LDY $32				;something something
-   BEQ CODE_CA5E
-   CPY #$04
-   BEQ CODE_CA5E
+   LDY $32				;load attributes based on ledge value
+   BEQ CODE_CA5E			;tile 93
+   CPY #$04				;ice (test your skill bonus)
+   BEQ CODE_CA5E			;
    
    LDA #<DATA_F276			;$76                 
    LDX #>DATA_F276			;$F2                 
-   CPY #$01                 
-   BEQ CODE_CA5E
-   CPY #$03
-   BEQ CODE_CA5E
+   CPY #$01				;tile 94
+   BEQ CODE_CA5E			;
+   CPY #$03				;tile 96
+   BEQ CODE_CA5E			;
    
-   LDA #<DATA_F286			;$86                 
+   LDA #<DATA_F286			;$86 (for tile 95)          
    LDX #>DATA_F286			;$F2
 
 CODE_CA5E:
@@ -3881,9 +3881,9 @@ CODE_D3A8:
    LDA #$00                 		;reset lotta flags 'n values
    STA MarioGameOverFlag                ;mario's gameover flag
    STA LuigiGameOverFlag                ;luigi's gameover flag
-   STA $51                  
-   STA $46                  
-   STA $05FB                
+   STA $51				;phase complete
+   STA $46				;last enemy flag
+   STA $05FB
    STA $05FC
    STA $43                  
    STA $44                  
@@ -4144,16 +4144,16 @@ CODE_D502:
    RTS
 
 CODE_D508:
-   JSR CODE_CA3B			;write attributes and stuff
+   JSR CODE_CA3B			;write attributes
    
    LDA $32				;load ledge tile value that is used to build ledges (changes in some phases)
    CLC					;apply offset to get correct tiles (93, 94, 95 and 96)
    ADC #$93				;
    STA $07				;
    
-   LDX #$00
-   LDY #$00
-   STY $1C
+   LDX #$00				;
+   LDY #$00				;
+   STY $1C				;
 
 CODE_D518:
    LDA #$03                 
@@ -8899,79 +8899,79 @@ DATA_F0A1:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 DATA_F0A5:
-.db $20,$83			;location to write to
+.dw $2083			;location to write to
 .db $02				;amount of bytes to write in line
 .db $76,$7A			;tiles to write
 
-.db $20,$A3			;next location
+.dw $20A3			;next location
 .db $02				;amount of tiles
 .db $77,$79			;tiles
 
-.db $20,$9A			;etc.
+.dw $209A			;etc.
 .db $02
 .db $7C,$7E
 
-.db $20,$BA
+.dw $20BA
 .db $02
 .db $7D,$7F
 
-.db $21,$63
+.dw $2163
 .db $02
 .db $80,$82
 
-.db $21,$83
+.dw $2183
 .db $02
 .db $81,$83
 
-.db $21,$7A
+.dw $217A
 .db $02
 .db $84,$86
 
-.db $21,$9A
+.dw $219A
 .db $02
 .db $85,$87
 
-.db $20,$85
+.dw $2085
 .db $4A				;if bit 6 is set, it'll reset that bit and repeat a single tile multiple times (probably not entirely true)
 .db $7B				;so, bit 6 is reset, so it'll write $0A of this tile in a row
 
-.db $20,$90
+.dw $2090
 .db $4A
 .db $7B
 
-.db $21,$85
+.dw $2185
 .db $4A
 .db $89
 
-.db $21,$90
+.dw $2190
 .db $4A
 .db $89
 
-.db $20,$C3
+.dw $20C3
 .db $19				;this time we write 25 tiles in a row
 .db $78,$24,$24,$68,$69,$69,$6B,$69,$68
 .db $69,$68,$6B,$69,$24,$68,$69,$68
 .db $69,$6B,$69,$6B,$69,$24,$24,$88
 
-.db $20,$E6
+.dw $20E6
 .db $13				;this time 19 tiles
 .db $68,$6A,$6A,$6E,$6A
 .db $68,$6A,$68,$6E,$6A,$24,$68,$6A
 .db $68,$6A,$6E,$6A,$6E,$71
 
-.db $21,$06
+.dw $2106
 .db $13
 .db $68,$6A,$6A,$68,$6C,$68,$6D
 .db $68,$6E,$6A,$24,$68,$6D,$68,$6D
 .db $6E,$6A,$6F,$69
 
-.db $21,$26
+.dw $2126
 .db $13
 .db $68,$6A,$6A,$6E,$6A,$68,$6A,$68,$6E
 .db $6A,$24,$68,$6A,$68,$6A,$6E,$6A
 .db $72,$6A
 
-.db $21,$43
+.dw $2143
 .db $19
 .db $78,$24,$24,$68,$6A,$6A,$6E,$6A
 .db $68,$6A,$68,$6F,$70,$24,$68,$70
@@ -8981,60 +8981,60 @@ DATA_F0A5:
 ;this is where strings are stored (1 PLAYER GAME A, 2 PLAYER GAME B, etc.)
 
 ;1 PLAYER GAME A
-.db $22,$09
+.dw $2209
 .db $0F
 .db $01,$24,$19,$15,$0A,$22,$0E
 .db $1B,$24,$10,$0A,$16,$0E,$24,$0A
 
 ;1 PLAYER GAME B
-.db $22,$49
+.dw $2249
 .db $0F
 .db $01,$24,$19,$15,$0A
 .db $22,$0E,$1B,$24,$10,$0A,$16,$0E
 .db $24,$0B
 
 ;2 PLAYER GAME A
-.db $22,$89
+.dw $2289
 .db $0F
 .db $02,$24,$19
 .db $15,$0A,$22,$0E,$1B,$24,$10,$0A
 .db $16,$0E,$24,$0A
 
 ;2 PLAYER GAME B
-.db $22,$C9
+.dw $22C9
 .db $0F
 .db $02,$24,$19,$15,$0A,$22,$0E,$1B,$24
 .db $10,$0A,$16,$0E,$24,$0B
 
 ;(c)1983 NINTENDO CO.,LTD.
-.db $23,$05
+.dw $2305
 .db $16
 .db $25,$01,$09,$08,$03,$24,$17
 .db $12,$17,$1D,$0E,$17,$0D,$18,$24
 .db $0C,$18,$28,$15,$1D,$0D,$26
 
 ;MADE IN JAPAN
-.db $23,$4B
+.dw $234B
 .db $0D
 .db $16,$0A,$0D,$0E,$24,$12
 .db $17,$24,$13,$0A,$19,$0A,$17
 
 ;finally, attributes to give our tiles some color
-.db $23,$C8
+.dw $23C8
 .db $0F
 .db $AA,$2A,$0A,$0A,$0A,$0A
 .db $8A,$00,$FF,$30,$00,$00,$00,$00
 .db $C0
 
-.db $23,$D8
+.dw $23D8
 .db $48				;repeat 8 times same attribute
 .db $FF
 
-.db $23,$E0
+.dw $23E0
 .db $50
 .db $55
 
-.db $23,$F0
+.dw $23F0
 .db $48
 .db $AA
 
@@ -9053,7 +9053,7 @@ DATA_F1E7:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 DATA_F203:
-.db $3F,$00				;PPU Address to write to
+.dw $3F00				;PPU Address to write to
 
 .db $20					;How many bytes to write (32 in dec)
 
@@ -9071,7 +9071,7 @@ DATA_F203:
 .db $00					;Command used to stop writing.
 
 DATA_F227:
-.db $3F,$00				;PPU Address
+.dw $3F00				;PPU Address
 
 .db $14					;Write 20 bytes to PPU. That means no Sprite Palette 2-4 overwrite.
 
@@ -9089,14 +9089,14 @@ DATA_F227:
 ;attributes that ar written for all phases. that being HUD and brick floor. just like before, uses generic PPU write format.
 
 DATA_F23F:
-.db $23,$C0				;PPU address
+.dw $23C0				;PPU address
 
 .db $10					;16 bytes
 
 .db $00,$00,$C0,$30,$00,$50,$00,$00
 .db $55,$55,$00,$00,$00,$00,$55,$55
 
-.db $23,$F0				;another PPU address, being at the bottom of the screen, aka brick flooring
+.dw $23F0				;another PPU address, being at the bottom of the screen, aka brick flooring
 
 .db $10					;16 bytes
 
@@ -9105,17 +9105,54 @@ DATA_F23F:
 
 .db $00					;stop write
 
+
+;attributes used for ledge tiles 93 and 97
 DATA_F266:
-.db $23,$D0,$58,$00,$23,$E8,$08,$50
-.db $00,$00,$00,$00,$00,$00,$50,$00
+.dw $23D0
 
+.db $58					;repeat one byte $18 times
+
+.db $00					;
+
+.dw $23E8
+
+.db $08					;8 bytes
+
+.db $50,$00,$00,$00,$00,$00,$00,$50	;
+
+.db $00					;end
+
+;attributes used for ledge tiles 94 and 96
 DATA_F276:
-.db $23,$D0,$58,$AA,$23,$E8,$08,$5A
-.db $AA,$AA,$00,$00,$AA,$AA,$5A,$00
+.dw $23D0
 
+.db $58
+
+.db $AA
+
+.db $23E8
+
+.db $08
+
+.db $5A,$AA,$AA,$00,$00,$AA,$AA,$5A
+
+.db $00
+
+;attributes used for ledge tile 95
 DATA_F286:
-.db $23,$D0,$58,$FF,$23,$E8,$08,$5F
-.db $FF,$FF,$00,$00,$FF,$FF,$5F,$00
+.db $23,$D0
+
+.db $58
+
+.db $FF
+
+.dw $23E8
+
+.db $08
+
+.db $5F,$FF,$FF,$00,$00,$FF,$FF,$5F
+
+.db $00
 
 DATA_F296:
 .db $A6,$F2,$B9,$F2,$C6,$F2
