@@ -60,7 +60,7 @@ HighScore = $91				;3 bytes
 
 Player1Score = $95			;3 bytes
 
-Player1Score = $99			;3 bytes
+Player2Score = $99			;3 bytes
 
 Player2ScoreDisplay = $9E		;seems to be another flag for score display for player 2, except this doesn't handles "II" tile on screen.
 
@@ -74,4 +74,8 @@ Player2BonusCoins = $04B6
 
 RandomNumberStorage = $0500		;
 
+;VRAM Write routine values, used as commands
 
+VRAMWriteCommand_Repeat = $40   ;bit 6 will make repeat writes of one value
+
+VRAMWriteCommand_Stop = $00     ;command to stop VRAM write and return from routine.
