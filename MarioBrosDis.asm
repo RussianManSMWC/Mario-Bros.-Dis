@@ -2064,7 +2064,7 @@ CODE_CAB6:
    
 CODE_CAB9:
    LDA #<DATA_F393			;$93     
-   STA $14
+   STA $14				;
    
    LDA #>DATA_F393			;$F3
    STA $15
@@ -2279,105 +2279,105 @@ CODE_CBC3:
 
 ;seems to be a general sprite GFX drawing routine
 CODE_CBC4:
-   LDA $B0                  
-   BEQ CODE_CBC3
+   LDA $B0					;if current entity is non-existent
+   BEQ CODE_CBC3				;don't draw
    
-   LDA #>DATA_F296           
+   LDA #>DATA_F296				;load pointer table for graphics for current entity
    STA $15
    
-   LDA #<DATA_F296            
+   LDA #<DATA_F296
    STA $14
 
-   LDA $B5                  
-   JSR CODE_CC29
+   LDA $B5					;entity ID
+   JSR CODE_CC29				;get pointers
    
-   LDA $B6                  
-   STA $11
+   LDA $B6					;first sprite tile to draw from (as in first tile is 12, then 13, then 14, etc.)
+   STA $11					;
    
-   LDY #$00                 
-   LDX $BA
+   LDY #$00					;
+   LDX $BA					;OAM offset
 
 CODE_CBDD:
-   LDA ($12),Y              
-   BEQ CODE_CBE9                
-   BPL CODE_CBE4                
+   LDA ($12),Y					;
+   BEQ CODE_CBE9				;check if it should animate with frame counter?
+   BPL CODE_CBE4				;if bit 7 is set, it'll animate slower (or faster, idk)
    ASL A
 
 CODE_CBE4:  
-   EOR $2F                  
-   LSR A                    
-   BCS CODE_CC1D
+   EOR $2F					;
+   LSR A					;
+   BCS CODE_CC1D				;load different tiles
 
 CODE_CBE9:  
-   INY                      
-   LDA ($12),Y
+   INY
+   LDA ($12),Y					;Y-position offset
    
-   INY                      
-   CLC                      
-   ADC $B8                  
-   ADC #$FF                 
+   INY						;
+   CLC						;
+   ADC $B8					;add to current entity's Y-position
+   ADC #$FF					;
+   STA $0200,X					;sprite's Y-pos
+   
+   INX
+   LDA $11					;sprite tile
+   STA $0200,X					;
+   
+   INC $11					;next tile value
+   
+   INX						;current entity's GFX properties
+   LDA $B7					;
    STA $0200,X
    
-   INX                      
-   LDA $11                  
-   STA $0200,X
+   INX						;
+   LDA ($12),Y					;load X-position offset
    
-   INC $11
-   
-   INX                      
-   LDA $B7                  
-   STA $0200,X 
-   
-   INX                      
-   LDA ($12),Y
-   
-   BIT $B7                  
-   BVS CODE_CC0D                
-   CLC                      
-   BCC CODE_CC13
+   BIT $B7					;if flipped horizontally, invert offset
+   BVS CODE_CC0D				;
+   CLC						;
+   BCC CODE_CC13				;
 
 CODE_CC0D:  
-   EOR #$FF                 
-   SEC                      
-   SBC #$08                 
-   SEC
+   EOR #$FF					;
+   SEC						;
+   SBC #$08					;
+   SEC						;
    
 CODE_CC13:  
-   ADC $B9                  
-   INY                      
-   STA $0200,X              
-   INX                      
-   JMP CODE_CC22
+   ADC $B9					;current entity's X-position
+   INY						;
+   STA $0200,X					;
+   INX						;
+   JMP CODE_CC22				;check end command
 
 CODE_CC1D:
-   INY 
-   INY                      
-   INY                      
-   INC $11
+   INY						;
+   INY						;
+   INY						;
+   INC $11					;
 
 CODE_CC22:   
-   LDA ($12),Y              
-   CMP #$AA                 
-   BNE CODE_CBDD                
+   LDA ($12),Y					;if hit end command (AA), end drawing
+   CMP #$AA					;
+   BNE CODE_CBDD				;otherwise loop
    RTS                      
    
 CODE_CC29:
-   ASL A                    
+   ASL A					;get correct pointer, multiply by 2
    STA $12
    
-   LDA #$00                 
-   TAY                      
-   ROL A                    
+   LDA #$00					;reset A and Y (not sure why ROL is here)
+   TAY
+   ROL A
    STA $13
    
-   JSR CODE_CDB4
+   JSR CODE_CDB4				;add to offset
    
-   LDA ($14),Y              
-   STA $12                  
-   INY                      
-   LDA ($14),Y              
-   STA $13                  
-   RTS                      
+   LDA ($14),Y					;get graphic data pointer
+   STA $12					;
+   INY						;
+   LDA ($14),Y					;
+   STA $13					;
+   RTS						;
    
 CODE_CC3F:
    LDA $B8                  
@@ -9130,7 +9130,7 @@ DATA_F276:
 
 .db $AA
 
-.db $23E8
+.dw $23E8
 
 .db $08
 
@@ -9140,7 +9140,7 @@ DATA_F276:
 
 ;attributes used for ledge tile 95
 DATA_F286:
-.db $23,$D0
+.dw $23D0
 
 .db $58
 
@@ -9154,21 +9154,46 @@ DATA_F286:
 
 .db $00
 
+;graphic pointers for every entity in game
 DATA_F296:
-.db $A6,$F2,$B9,$F2,$C6,$F2
-.db $C6,$F2,$D0,$F2,$DA,$F2,$E1,$F2
-.db $E8,$F2,$00,$EF,$F8,$00,$EF,$00
+.db <DATA_F2A6,>DATA_F2A6				;$A6,$F2	;mario
+.db <DATA_F2B9,>DATA_F2B9				;$B9,$F2
+.db <DATA_F2C6,>DATA_F2C6				;$C6,$F2
+.db <DATA_F2C6,>DATA_F2C6				;$C6,$F2
+.db <DATA_F2D0,>DATA_F2D0				;$D0,$F2
+.db <DATA_F2DA,>DATA_F2DA				;$DA,$F2
+.db <DATA_F2E1,>DATA_F2E1				;$E1,$F2
+.db <DATA_F2F2,>DATA_F2F2				;$E8,$F2
+
+DATA_F2A6:
+.db $00,$EF,$F8,$00,$EF,$00,$00,$F7
+.db $F8,$00,$F7,$00,$00,$00,$F8,$00
+.db $00,$00,$AA
+
+DATA_F2B9:
 .db $00,$F7,$F8,$00,$F7,$00,$00,$00
-.db $F8,$00,$00,$00,$AA,$00,$F7,$F8
-.db $00,$F7,$00,$00,$00,$F8,$00,$00
-.db $00,$AA,$80,$F7,$F8,$01,$F7,$00
-.db $00,$00,$FC,$AA,$00,$F7,$FC,$80
-.db $00,$F8,$01,$00,$00,$AA,$00,$F7
-.db $FC,$00,$00,$FC,$AA,$00,$F7,$F8
-.db $00,$00,$FC,$AA,$00,$FC,$FC,$AA
+.db $F8,$00,$00,$00,$AA
+
+DATA_F2C6:
+.db $80,$F7,$F8,$01,$F7,$00,$00,$00
+.db $FC,$AA
+
+DATA_F2D0:
+.db $00,$F7,$FC,$80,$00,$F8,$01,$00
+.db $00,$AA
+
+DATA_F2DA:
+.db $00,$F7,$FC,$00,$00,$FC,$AA
+
+DATA_F2E1:
+.db $00,$F7,$F8,$00,$00,$FC,$AA,$00
+.db $FC,$FC,$AA
    
 DATA_F2EC:
-.db $01,$00,$03,$00,$00,$00,$12,$40
+.db $01,$00,$03,$00,$00,$00
+
+DATA_F2F2:
+.db $12,$40
 .db $D0,$44,$10,$00,$00,$00,$00,$01
 .db $00,$00,$00,$00,$00,$01,$00,$00
 .db $00,$00,$00,$00,$00,$00,$04,$04
@@ -9252,21 +9277,50 @@ DATA_F452:
 .db $00,$00,$00,$00,$00,$01,$00,$00
 .db $00,$00,$00,$00,$00,$00,$05,$06
 
- 
+;holds first tile values for Mario/Luigi and other's animated frames
+;first byte is a animation timing? or some kind of offset.
+;FF is loop (go to first animation frame)
+
 DATA_F4B2:
-.db $06,$0C,$00,$0C,$FF,$00,$26,$2C
-.db $FF,$06,$52,$54,$52,$56,$FF,$0A
+;running
+.db $06,$0C,$00,$0C,$FF
+
+;skidding
+.db $00,$26,$2C,$FF
+
+.db $06				;unsure
+
+;shellcreeper
+,db $52,$54,$52,$56,$FF
+
+.db $0A				;unsure
+
+;sidestepper
 .db $6C,$6C,$6F,$6F,$6C,$6C,$72,$72
-.db $FF,$10,$D0,$D0,$D3,$D3,$D0,$D0
-.db $D6,$D6,$FF,$1A,$7D,$7D,$80,$80
-.db $83,$83,$FF,$24,$A1,$A3,$A5,$A7
-.db $A9,$FF,$2C,$8C,$8E,$90,$FF,$33
-.db $B4,$B8,$BC
+.db $FF
 
-.db $FF,$38					;unused?
+;sidestepper (hit once)
+.db $10,$D0,$D0,$D3,$D3,$D0,$D0
+.db $D6,$D6,$FF
 
-DATA_F4EF:
-.db $92,$93,$94,$95,$FF,$3D
+;fighterfly
+.db $1A,$7D,$7D,$80,$80
+.db $83,$83,$FF
+
+;coin
+.db $24,$A1,$A3,$A5,$A7
+.db $A9,$FF
+
+;freezie
+.db $2C,$8C,$8E,$90,$FF
+
+;splash
+.db $33,$B4,$B8,$BC,$FF
+
+;fireball
+.db $38,$92,$93,$94,$95,$FF
+
+.db $3D
 
 DATA_F4F5:
 .db $20,$82
