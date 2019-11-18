@@ -1,8 +1,8 @@
 ;Mario Bros. (NES) Disassembly.
-;not very much documented yet. there are probably some leftovers from my debugging. though I made sure to clean this file.
+;not very much documented yet.
 ;But it's pretty much an accurate byte-to-byte MB. disassembly.
 ;
-;Do note that information related with NES's architecture, PPU, APU, CPU and etc. may be incorrect, because I'm an awful programmer. whoops.
+;Do note that information related with NES's architecture, PPU, APU, CPU and etc. may be incorrect, because i'm not good at understanding things. oops.
 ;All ROM labels are going to be renamed from generic CODE_XXXX (or DATA_XXXX), to some name that briefly states routine's function.
 ;Same goes for RAM addresses, to make it easy to understand on what specific address does in code.
 ;For now, enjoy my barebones disassembly.
@@ -168,31 +168,31 @@ CODE_C0AC:
    RTI							;exit interrupt
    
 CODE_C0B6:
-   LDA $B0
-   BEQ CODE_C0BF
+   LDA $B0						;if current entity (presumebly Mario) isn't active, return 
+   BEQ CODE_C0BF					;
    
-   LDA $0320
-   BNE CODE_C0C2
+   LDA $0320						;if luigi is active, check collision between brothers?
+   BNE CODE_C0C2					;
    
 CODE_C0BF:
-   JMP CODE_C149
+   JMP CODE_C149					;
    
 CODE_C0C2:
-   LDA #$20
-   STA $14
+   LDA #$20						;
+   STA $14						;
    
-   LDA #$03
-   STA $15
+   LDA #$03						;
+   STA $15						;
    
-   LDA #$01
-   STA $11
+   LDA #$01						;
+   STA $11						;
    
-   LDY #$0B
-   LDX #$08
+   LDY #$0B						;
+   LDX #$08						;
    JSR CODE_C44A					;check interaction between players?
-   STA $05F7
-   ORA #$00
-   BEQ CODE_C149
+   STA $05F7						;
+   ORA #$00						;ok?
+   BEQ CODE_C149					;
    
    LDA $C6
    ORA $0336
@@ -8899,79 +8899,79 @@ DATA_F0A1:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 DATA_F0A5:
-.dw $2083			;location to write to
+.db $20,$83			;location to write to
 .db $02				;amount of bytes to write in line
 .db $76,$7A			;tiles to write
 
-.dw $20A3			;next location
+.db $20,$A3			;next location
 .db $02				;amount of tiles
 .db $77,$79			;tiles
 
-.dw $209A			;etc.
+.db $20,$9A			;etc.
 .db $02
 .db $7C,$7E
 
-.dw $20BA
+.db $20,$BA
 .db $02
 .db $7D,$7F
 
-.dw $2163
+.db $21,$63
 .db $02
 .db $80,$82
 
-.dw $2183
+.db $21,$83
 .db $02
 .db $81,$83
 
-.dw $217A
+.db $21,$7A
 .db $02
 .db $84,$86
 
-.dw $219A
+.db $21,$9A
 .db $02
 .db $85,$87
 
-.dw $2085
+.db $20,$85
 .db $4A				;if bit 6 is set, it'll reset that bit and repeat a single tile multiple times (probably not entirely true)
 .db $7B				;so, bit 6 is reset, so it'll write $0A of this tile in a row
 
-.dw $2090
+.db $2090
 .db $4A
 .db $7B
 
-.dw $2185
+.db $21,$85
 .db $4A
 .db $89
 
-.dw $2190
+.db $21,$90
 .db $4A
 .db $89
 
-.dw $20C3
+.db $20,$C3
 .db $19				;this time we write 25 tiles in a row
 .db $78,$24,$24,$68,$69,$69,$6B,$69,$68
 .db $69,$68,$6B,$69,$24,$68,$69,$68
 .db $69,$6B,$69,$6B,$69,$24,$24,$88
 
-.dw $20E6
+.db $20,$E6
 .db $13				;this time 19 tiles
 .db $68,$6A,$6A,$6E,$6A
 .db $68,$6A,$68,$6E,$6A,$24,$68,$6A
 .db $68,$6A,$6E,$6A,$6E,$71
 
-.dw $2106
+.db $21,$06
 .db $13
 .db $68,$6A,$6A,$68,$6C,$68,$6D
 .db $68,$6E,$6A,$24,$68,$6D,$68,$6D
 .db $6E,$6A,$6F,$69
 
-.dw $2126
+.db $21,$26
 .db $13
 .db $68,$6A,$6A,$6E,$6A,$68,$6A,$68,$6E
 .db $6A,$24,$68,$6A,$68,$6A,$6E,$6A
 .db $72,$6A
 
-.dw $2143
+.db $21,$43
 .db $19
 .db $78,$24,$24,$68,$6A,$6A,$6E,$6A
 .db $68,$6A,$68,$6F,$70,$24,$68,$70
@@ -8981,60 +8981,60 @@ DATA_F0A5:
 ;this is where strings are stored (1 PLAYER GAME A, 2 PLAYER GAME B, etc.)
 
 ;1 PLAYER GAME A
-.dw $2209
+.db $22,$09
 .db $0F
 .db $01,$24,$19,$15,$0A,$22,$0E
 .db $1B,$24,$10,$0A,$16,$0E,$24,$0A
 
 ;1 PLAYER GAME B
-.dw $2249
+.db $22,$49
 .db $0F
 .db $01,$24,$19,$15,$0A
 .db $22,$0E,$1B,$24,$10,$0A,$16,$0E
 .db $24,$0B
 
 ;2 PLAYER GAME A
-.dw $2289
+.db $22,$89
 .db $0F
 .db $02,$24,$19
 .db $15,$0A,$22,$0E,$1B,$24,$10,$0A
 .db $16,$0E,$24,$0A
 
 ;2 PLAYER GAME B
-.dw $22C9
+.db $22,$C9
 .db $0F
 .db $02,$24,$19,$15,$0A,$22,$0E,$1B,$24
 .db $10,$0A,$16,$0E,$24,$0B
 
 ;(c)1983 NINTENDO CO.,LTD.
-.dw $2305
+.db $23,$05
 .db $16
 .db $25,$01,$09,$08,$03,$24,$17
 .db $12,$17,$1D,$0E,$17,$0D,$18,$24
 .db $0C,$18,$28,$15,$1D,$0D,$26
 
 ;MADE IN JAPAN
-.dw $234B
+.db $23,$4B
 .db $0D
 .db $16,$0A,$0D,$0E,$24,$12
 .db $17,$24,$13,$0A,$19,$0A,$17
 
 ;finally, attributes to give our tiles some color
-.dw $23C8
+.db $23,$C8
 .db $0F
 .db $AA,$2A,$0A,$0A,$0A,$0A
 .db $8A,$00,$FF,$30,$00,$00,$00,$00
 .db $C0
 
-.dw $23D8
+.db $23,$D8
 .db $48				;repeat 8 times same attribute
 .db $FF
 
-.dw $23E0
+.db $23,$E0
 .db $50
 .db $55
 
-.dw $23F0
+.db $23,$F0
 .db $48
 .db $AA
 
@@ -9053,8 +9053,7 @@ DATA_F1E7:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 DATA_F203:
-.dw $3F00				;PPU Address to write to
-
+.db $3F,$00				;PPU Address to write to
 .db $20					;How many bytes to write (32 in dec)
 
 ;Gameplay Palette, used during, well, gameplay, including demo.
@@ -9071,8 +9070,7 @@ DATA_F203:
 .db $00					;Command used to stop writing.
 
 DATA_F227:
-.dw $3F00				;PPU Address
-
+.db $3F,$00				;PPU Address
 .db $14					;Write 20 bytes to PPU. That means no Sprite Palette 2-4 overwrite.
 
 ;Palette used for title screen.
@@ -9089,17 +9087,13 @@ DATA_F227:
 ;attributes that ar written for all phases. that being HUD and brick floor. just like before, uses generic PPU write format.
 
 DATA_F23F:
-.dw $23C0				;PPU address
-
+.db $23,$C0				;PPU address
 .db $10					;16 bytes
-
 .db $00,$00,$C0,$30,$00,$50,$00,$00
 .db $55,$55,$00,$00,$00,$00,$55,$55
 
-.dw $23F0				;another PPU address, being at the bottom of the screen, aka brick flooring
-
+.db $23,$F0				;another PPU address, being at the bottom of the screen, aka brick flooring
 .db $10					;16 bytes
-
 .db $F5,$FF,$FF,$FF,$FF,$FF,$FF,$F5
 .db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
 
@@ -9108,48 +9102,35 @@ DATA_F23F:
 
 ;attributes used for ledge tiles 93 and 97
 DATA_F266:
-.dw $23D0
-
+.db $23,$D0
 .db $58					;repeat one byte $18 times
-
 .db $00					;
 
-.dw $23E8
-
+.db $23,$E8
 .db $08					;8 bytes
-
 .db $50,$00,$00,$00,$00,$00,$00,$50	;
 
 .db $00					;end
 
 ;attributes used for ledge tiles 94 and 96
 DATA_F276:
-.dw $23D0
-
+.db $23,$D0
 .db $58
-
 .db $AA
 
-.dw $23E8
-
+.db $23,$E8
 .db $08
-
 .db $5A,$AA,$AA,$00,$00,$AA,$AA,$5A
-
-.db $00
+.db $00					;stop write
 
 ;attributes used for ledge tile 95
 DATA_F286:
-.dw $23D0
-
+.db $23,$D0
 .db $58
-
 .db $FF
 
-.dw $23E8
-
+.db $23,$E8
 .db $08
-
 .db $5F,$FF,$FF,$00,$00,$FF,$FF,$5F
 
 .db $00
@@ -9291,7 +9272,7 @@ DATA_F4B2:
 .db $06				;unsure
 
 ;shellcreeper
-,db $52,$54,$52,$56,$FF
+.db $52,$54,$52,$56,$FF
 
 .db $0A				;unsure
 
@@ -9433,7 +9414,6 @@ DATA_F671:
 .db $F4,$DF,$01,$C0				;/
 
 ;Title screen cursor OAM data, same format as above, Y-position is also overwritten.
-
 DATA_F689:
 .db $F4,$EE,$00,$38
 
