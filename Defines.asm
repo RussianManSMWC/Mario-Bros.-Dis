@@ -6,6 +6,9 @@
 Reg2000BitStorage = $09			;contains bits to be enabled/disabled for register $2000
 Reg2001BitStorage = $0A			;contains bits to be enabled/disabled for register $2001
 
+CameraPosY = $0B            ;current camera position
+CameraPosX = $0C            ;
+
 ;Controller addresses. Format: ABetUDLR, A = A button, B = B button, e = select, t = start, U = Up, D = Down, L = Left, R = Right.
 ;Do note that InputPress only resets A and B bits after press.
 
@@ -20,7 +23,7 @@ InterruptedFlag = $23			;Used to determine if game got interrupted with Non-mask
 TimingTimer = $2A			;timer used to decrease other timers.
 
 GeneralTimer2B = $2B			;used as timer for various things, for example as timer for bonus end, for each coin display, multiplication display and perfect/no bonus message and for unpause
-ShakeTimer = $2C			;timer used for screen shaking when POW block is hit
+ShakeTimer = $2C					;timer used for screen shaking when POW block is hit
 TransitionTimer = $2D			;used mostly for transitions, specifically, how long it takes before starting new phase after last enemy falls offscreen, timer before transitioning to bonus end and from it.
 PipeDelayTimer = $2E			;used for sprites coming out of pipes. when timer's zero, sprite comes out of pipe.
 
@@ -64,18 +67,20 @@ Player2Score = $99			;3 bytes
 
 Player2ScoreDisplay = $9E		;seems to be another flag for score display for player 2, except this doesn't handles "II" tile on screen.
 
-BonusTimeSecs = $04B1
+CurrentEntity_ActiveFlag = $B0    ;flag for current entity wether it exists or not
+CurrentEntity_Bits = $B1		      ;some kind of bits that represent current entity's state
+CurrentEntity_ID = $B5
 
+BonusTimeSecs = $04B1
 BonusTimeMilliSecs = $04B2
 
 Player1BonusCoins = $04B5
-
 Player2BonusCoins = $04B6
 
-RandomNumberStorage = $0500		;
+RandomNumberStorage = $0500
 
 ;VRAM Write routine values, used as commands
 
-VRAMWriteCommand_Repeat = $40   ;bit 6 will make repeat writes of one value
+VRAMWriteCommand_Repeat = $40     ;bit 6 will make repeat writes of one value
 
-VRAMWriteCommand_Stop = $00     ;command to stop VRAM write and return from routine.
+VRAMWriteCommand_Stop = $00       ;command to stop VRAM write and return from routine.
