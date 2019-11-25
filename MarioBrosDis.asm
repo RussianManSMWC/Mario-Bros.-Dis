@@ -7482,8 +7482,6 @@ CODE_E769:
    STA $04F7,X              
    RTS
 
-;CONTINUE CHECKING FOR INDIRECTS FROM HERE!!!
-
 CODE_E772:   
    LDA $0320                
    BEQ CODE_E768
@@ -7615,8 +7613,8 @@ CODE_E830:
    STA $0430                
    JSR CODE_E96D
    
-   LDX #$DB                 
-   LDY #$EF
+   LDX #<DATA_EFD8				;$DB                 
+   LDY #>DATA_EFD8				;$EF
 
 CODE_E842:   
    STX $042C                
@@ -7657,8 +7655,8 @@ CODE_E877:
    STA $0430
 
 CODE_E883:
-   LDX #$1B                 
-   LDY #$F0
+   LDX #<DATA_F01B				;$1B                 
+   LDY #>DATA_F01B				;$F0
    BNE CODE_E842
   
 CODE_E889:
@@ -7697,7 +7695,6 @@ CODE_E8AD:
    STA $0200,X              
    JMP CODE_E805
 
-   
 CODE_E8BE:
    LDA #$02                 
    STA $00
@@ -8010,8 +8007,8 @@ CODE_EA7C:
    BCS CODE_EA90
    
    LDA #$01                 
-   LDX #$9D                 
-   LDY #$EF
+   LDX #<DATA_EF9D			;$9D                 
+   LDY #>DATA_EF9D			;$EF
   
 CODE_EA87:
    STA $0350                
@@ -8246,14 +8243,14 @@ CODE_EBE0:
 
 CODE_EBE9:  
    LDA #$02                 
-   LDX #$06                 
-   LDY #$F0                 
+   LDX #<DATA_F006			;$06                 
+   LDY #>DATA_F006			;$F0                 
    JMP CODE_EA87
 
 CODE_EBF2:  
    LDX $034A                
    LDA $0348                
-   CLC                      
+   CLC
    ADC #$FC                 
    STA $0200,X
    
@@ -8635,11 +8632,23 @@ CODE_EE4C:
    BPL CODE_EE4C                
    RTS                      
 
-   
+;Freezie platform freeze pointers
 DATA_EE53:
-.db $F7,$63,$F7,$6D,$F7,$7B,$F7,$8B
-.db $00,$F7,$9B,$F7,$A4,$F7,$B3,$00
-.db $F7,$C2,$F7,$CB,$F7,$DA,$00
+.db >DATA_F763,<DATA_F763			;$F7,$63
+.db >DATA_F76D,<DATA_F76D			;$F7,$6D
+.db >DATA_F77B,<DATA_F77B			;$F7,$7B
+.db >DATA_F78B,<DATA_F78B			;$F7,$8B
+.db $00
+
+.db >DATA_F79B,<DATA_F79B			;$F7,$9B
+.db >DATA_F7A4,<DATA_F7A4			;$F7,$A4
+.db >DATA_F7B3,<DATA_F7B3			;$F7,$B3
+.db $00
+
+.db >DATA_F7C2,<DATA_F7C2			;$F7,$C2
+.db >DATA_F7CB,<DATA_F7CB			;$F7,$CB
+.db >DATA_F7DA,<DATA_F7DA			;$F7,$DA
+.db $00
 
 CODE_EE6A:
    LDA $04C7
@@ -8658,7 +8667,9 @@ CODE_EE6A:
 
 CODE_EE81:
    RTS
-   
+
+;Keep checking for indirects after here...
+
 CODE_EE82:
    LDA $00                  
    PHA
@@ -8843,11 +8854,14 @@ DATA_EF97:
 .db $42				;16 for 1600
 .db $43				;24 for 2400
 .db $44				;32 for 3200
-.db $3E				;2 for 200 (unused?)
+.db $3E				;2 for 200 (unused)
 .db $3F				;5 for 500
 
 DATA_EF9C:
-.db $9C,$00,$9D,$00,$9F,$00,$00
+.db $9C
+
+DATA_EF9D:
+.db $00,$9D,$00,$9F,$00,$00
 .db $9D,$00,$9B,$00,$00,$92,$00,$00
 .db $93,$00,$00,$94,$00,$00,$95,$00
 .db $92,$00,$93,$00,$94,$00,$FF
@@ -8856,7 +8870,10 @@ DATA_EFBB:
 .db $01,$01,$03,$01,$3D,$07,$92,$02
 .db $F4,$00,$04,$00,$00,$00,$00,$B0
 .db $00,$01,$00,$00,$00,$01,$00,$00
-.db $00,$00,$00,$00,$00,$00,$04,$04
+.db $00,$00,$00,$00,$00
+
+DATA_EFD8:
+.db $00,$04,$04
 .db $9C,$00,$9D,$00,$9F,$00,$9C,$00
 .db $9D,$00,$9F,$00,$9C,$00,$9D,$00
 .db $9F,$00,$9C,$00,$9D,$00,$9F,$00
@@ -8865,6 +8882,8 @@ DATA_EFBB:
 .db $9B,$00,$FF,$9B,$00,$9C,$00,$9D
 .db $00,$00,$9E,$00,$9F,$00,$9C,$00
 .db $9D,$00,$00,$9E,$00,$9F,$00,$FF
+
+DATA_F01B:
 .db $00,$00,$FF,$FF,$DD,$FF,$FE,$FE
 .db $FD,$FE,$FE,$FF,$FF,$00,$FF,$00
 .db $FF,$00,$00,$00,$01,$00,$01,$00
@@ -8935,7 +8954,7 @@ DATA_F0A5:
 .db $4A				;if bit 6 is set, it'll reset that bit and repeat a single tile multiple times (probably not entirely true)
 .db $7B				;so, bit 6 is reset, so it'll write $0A of this tile in a row
 
-.db $2090
+.db $20,$90
 .db $4A
 .db $7B
 
@@ -9137,14 +9156,14 @@ DATA_F286:
 
 ;graphic pointers for every entity in game
 DATA_F296:
-.db <DATA_F2A6,>DATA_F2A6				;$A6,$F2	;mario
-.db <DATA_F2B9,>DATA_F2B9				;$B9,$F2
-.db <DATA_F2C6,>DATA_F2C6				;$C6,$F2
-.db <DATA_F2C6,>DATA_F2C6				;$C6,$F2
-.db <DATA_F2D0,>DATA_F2D0				;$D0,$F2
-.db <DATA_F2DA,>DATA_F2DA				;$DA,$F2
-.db <DATA_F2E1,>DATA_F2E1				;$E1,$F2
-.db <DATA_F2F2,>DATA_F2F2				;$E8,$F2
+.dw DATA_F2A6				;$A6,$F2	;mario
+.dw DATA_F2B9				;$B9,$F2
+.dw DATA_F2C6				;$C6,$F2
+.dw DATA_F2C6				;$C6,$F2
+.dw DATA_F2D0				;$D0,$F2
+.dw DATA_F2DA				;$DA,$F2
+.dw DATA_F2E1				;$E1,$F2
+.dw DATA_F2E8				;$E8,$F2
 
 DATA_F2A6:
 .db $00,$EF,$F8,$00,$EF,$00,$00,$F7
@@ -9167,8 +9186,10 @@ DATA_F2DA:
 .db $00,$F7,$FC,$00,$00,$FC,$AA
 
 DATA_F2E1:
-.db $00,$F7,$F8,$00,$00,$FC,$AA,$00
-.db $FC,$FC,$AA
+.db $00,$F7,$F8,$00,$00,$FC,$AA
+
+DATA_F2E8:
+.db $00,$FC,$FC,$AA
    
 DATA_F2EC:
 .db $01,$00,$03,$00,$00,$00
@@ -9459,23 +9480,148 @@ DATA_F735:
 .db $30,$31,$31,$31,$31,$32,$20,$AD
 .db $06,$33,$02,$00,$66,$00,$34,$20
 .db $CD,$06,$35,$36,$36,$36,$36,$37
-.db $00,$21,$EE,$44,$97,$23,$DB,$02
-.db $20,$80,$00,$21,$EC,$42,$97,$21
-.db $F2,$42,$97,$23,$DB,$02,$00,$00
-.db $00,$21,$EA,$42,$97,$21,$F4,$42
-.db $97,$23,$DA,$04,$20,$00,$00,$80
-.db $00,$21,$E8,$42,$97,$21,$F6,$42
-.db $97,$23,$DA,$04,$00,$00,$00,$00
-.db $00,$22,$A4,$44,$97,$23,$E9,$01
-.db $50,$00,$22,$A2,$42,$97,$22,$A8
-.db $42,$97,$23,$E8,$03,$52,$00,$08
-.db $00,$22,$A0,$42,$97,$22,$AA,$42
-.db $97,$23,$E8,$03,$50,$00,$00,$00
-.db $22,$B8,$44,$97,$23,$EE,$01,$50
-.db $00,$22,$B6,$42,$97,$22,$BC,$42
-.db $97,$23,$ED,$03,$02,$00,$58,$00
-.db $22,$B4,$42,$97,$22,$BE,$42,$97
-.db $23,$ED,$03,$00,$00,$50,$00,$00
+.db $00
+
+;data for Freezie's platform freezing (replacing tiles, attributes)
+;Middle platform
+DATA_F763:
+.db $21,$EE
+.db $44
+.db $97
+
+.db $23,$DB
+.db $02
+.db $20,$80
+
+.db $00
+
+DATA_F76D:
+.db $21,$EC
+.db $42
+.db $97
+
+.db $21,$F2
+.db $42
+.db $97
+
+.db $23,$DB
+.db $02
+.db $00,$00
+
+.db $00
+
+DATA_F77B:
+.db $21,$EA
+.db $42
+.db $97
+
+.db $21,$F4
+.db $42
+.db $97
+
+.db $23,$DA
+.db $04
+.db $20,$00,$00,$80
+
+.db $00
+
+DATA_F78B:
+.db $21,$E8
+.db $42
+.db $97
+
+.db $21,$F6
+.db $42
+.db $97
+
+.db $23,$DA
+.db $04
+.db $00,$00,$00,$00
+
+.db $00
+
+DATA_F79B:
+.db $22,$A4
+.db $44
+.db $97
+
+.db $23,$E9
+.db $01
+.db $50
+
+.db $00
+
+DATA_F7A4:
+.db $22,$A2
+.db $42
+.db $97
+
+.db $22,$A8
+.db $42
+.db $97
+
+.db $23,$E8
+.db $03
+.db $52,$00,$08
+.db $00
+
+DATA_F7B3:
+.db $22,$A0
+.db $42
+.db $97
+
+.db $22,$AA
+.db $42
+.db $97
+
+.db $23,$E8
+.db $03
+.db $50,$00,$00
+
+.db $00
+
+DATA_F7C2:
+.db $22,$B8
+.db $44
+.db $97
+
+.db $23,$EE
+.db $01
+.db $50
+
+.db $00
+
+DATA_F7CB:
+.db $22,$B6
+.db $42
+.db $97
+
+.db $22,$BC
+.db $42
+.db $97
+
+.db $23,$ED
+.db $03
+.db $02,$00,$58
+
+.db $00
+
+DATA_F7DA:
+.db $22,$B4
+.db $42
+.db $97
+
+.db $22,$BE
+.db $42
+.db $97
+
+.db $23,$ED
+.db $03
+.db $00,$00,$50
+
+.db $00
+
+.db $00
 .db $03,$FF,$03,$00,$03,$00,$03,$FF
 .db $03,$01,$03,$01,$03,$00,$03,$01
 .db $03,$02,$03,$02,$03,$02,$02,$02
