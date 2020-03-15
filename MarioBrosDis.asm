@@ -167,6 +167,10 @@ CODE_C0AC:
    PLA							;/
    RTI							;exit interrupt
    
+;interaction between bros
+;$B1 - controller inputs of player 1
+;$10 - controller inputs of player 2
+;$05F7 - direction bits from which interaction has occured. Format: UD----RL, U - up, D - down, L - left, R - right.
 CODE_C0B6:
    LDA $B0						;if current entity (presumebly Mario) isn't active, return 
    BEQ CODE_C0BF					;
@@ -178,91 +182,91 @@ CODE_C0BF:
    JMP CODE_C149					;
    
 CODE_C0C2:
-   LDA #$20						;
+   LDA #$20						;set up indirect addressing ($0320)
    STA $14						;
    
    LDA #$03						;
    STA $15						;
    
-   LDA #$01						;
+   LDA #$01						;check only one hitbox. it's mario/luigi
    STA $11						;
    
    LDY #$0B						;
    LDX #$08						;
    JSR CODE_C44A					;check interaction between players?
-   STA $05F7						;
+   STA $05F7						;store bits of side from which interaction occured
    ORA #$00						;ok?
-   BEQ CODE_C149					;
+   BEQ CODE_C149					;no interaction if zero
    
-   LDA $C6
-   ORA $0336
-   BEQ CODE_C0F3
-   TAX
-   AND #$F0
-   BNE CODE_C149
-   TXA
-   AND #$0F
-   CMP #$04
-   BEQ CODE_C0F3
-   CMP #$08
-   BNE CODE_C149
+   LDA $C6						;if both bros are in normal state, contine checking
+   ORA $0336						;
+   BEQ CODE_C0F3					;
+   TAX							;
+   AND #$F0						;check if on of any high nibble bits enabled (indicates bro without interaction enabled aka dying)
+   BNE CODE_C149					;
+   TXA							;
+   AND #$0F						;different states check
+   CMP #$04						;if it's on small platform after death
+   BEQ CODE_C0F3					;can interact
+   CMP #$08						;if it's after being jumped on
+   BNE CODE_C149					;if not, don't interact
    
 CODE_C0F3:
-   LDA #$00
-   STA $05FE
+   LDA #$00						;some flag?
+   STA $05FE						;(probably useless, but IDK)
    
-   LDA $0321
-   STA $10
-   AND #$C0
-   BNE CODE_C152
+   LDA $0321						;button inputs by second player
+   STA $10						;into $10
+   AND #$C0						;check if it is A or B
+   BNE CODE_C152					;meaning the player is performing a jump (probably)
    
-   LDA $B1
-   AND #$C0
-   BNE CODE_C14F
+   LDA $B1						;check if it's player 1 who pressed A or B
+   AND #$C0						;
+   BNE CODE_C14F					;kinda cancel that jump
    
-   LDA $B1
-   AND #$03
-   BEQ CODE_C15E
+   LDA $B1						;then check direction
+   AND #$03						;
+   BEQ CODE_C15E					;if player 1 isn't moving, k
    
-   LDA $10
-   AND #$03
-   BEQ CODE_C161
+   LDA $10						;check if player 2's also mving
+   AND #$03						;
+   BEQ CODE_C161					;
    
-   JSR CODE_C3A0
+   JSR CODE_C3A0					;currently unknown
    
-   LDA $10
-   AND #$03
-   EOR $B1
-   AND #$03
-   BEQ CODE_C13E
+   LDA $10						;if both players have pressed left or right
+   AND #$03						;(i think this is bumping into each other when moving)
+   EOR $B1						;
+   AND #$03						;
+   BEQ CODE_C13E					;if not, player don't bump into each other, do pushing
    
-   LDA $05F7
-   AND #$0F
-   CMP #$02
-   BEQ CODE_C12E
+   LDA $05F7						;
+   AND #$0F						;
+   CMP #$02						;check if collided from the right...
+   BEQ CODE_C12E					;
    
-   LDA $B1
-   JMP CODE_C130
+   LDA $B1						;otherwise mario's on the left
+   JMP CODE_C130					;check player 1 direction first
    
 CODE_C12E:
-   LDA $10
+   LDA $10						;check player 2 direction first
    
 CODE_C130:
-   LSR A
-   BCC CODE_C149
+   LSR A						;check if direction pressed is right (?)
+   BCC CODE_C149					;if not, return
 
-   LDA $C4
-   CMP $0334
-   BEQ CODE_C15B
-   BCS CODE_C158
-   BCC CODE_C155
+   LDA $C4						;probably speed, maybe
+   CMP $0334						;bumped into each other with the same speed
+   BEQ CODE_C15B					;
+   BCS CODE_C158					;if mario's speed was hight, different kind of bump
+   BCC CODE_C155					;
    
 CODE_C13E:
    LDA $0334						;
    CMP $C4						;
    BEQ CODE_C164					;
-   BCS CODE_C155
-   BCC CODE_C158
+   BCS CODE_C155					;
+   BCC CODE_C158					;
    
 CODE_C149:   
    LDA #$00
@@ -616,33 +620,33 @@ CODE_C32E:
    BNE CODE_C2FF
    
 CODE_C334:
-   LDA $B1
-   ORA #$04
-   STA $0321
+   LDA $B1					;enable "being" pushed state bit?
+   ORA #$04					;this is swapping directions, as well?
+   STA $0321					;this is for luigi
    
-   LDA $10
-   ORA #$04
-   STA $B1
+   LDA $10					;same for mario
+   ORA #$04					;
+   STA $B1					;
    
-   LDA $C4
-   STA $00
+   LDA $C4					;save mario's X-speed
+   STA $00					;
    
-   LDA $CD
-   STA $01
+   LDA $CD					;i don't know what this is
+   STA $01					;
    
-   JSR CODE_C3C2
+   JSR CODE_C3C2				;
+
+   STA $C2					;
+   STA $0332					;
    
-   STA $C2
-   STA $0332
-   
-   LDA $00
-   BEQ CODE_C35A
-   
-   STA $B4
-   STA $0324
+   LDA $00					;
+   BEQ CODE_C35A				;
+  
+   STA $B4					;
+   STA $0324					;
    
  CODE_C35A:
-   RTS
+   RTS						;
    
 CODE_C35B:
    JSR CODE_C41F
@@ -698,31 +702,30 @@ CODE_C39D:
    JMP CODE_C3A8
    
 CODE_C3A0:
-   LDA $05FF
-   BEQ CODE_C3A8
-   PLA
-   PLA
-   RTS
+   LDA $05FF			;check some interaction flag
+   BEQ CODE_C3A8		;
+   PLA				;stop any further interaction
+   PLA				;
+   RTS				;
    
 CODE_C3A8:
-   LDY #$00
-   STY $C1
-   STY $0331
-   INY
-   STY $05FF
+   LDY #$00			;i think this is speed related
+   STY $C1			;dunno what dis is
+   STY $0331			;could be unused for luigi and marios entities
+   INY				;
+   STY $05FF			;
    
-   LDY $BB
-   BNE CODE_C3B9
-   
-   STA $BB
-   
+   LDY $BB			;not really sure what this is. direction related?
+   BNE CODE_C3B9		;not sure if this check is necessary. it it's zero, we store zero? (because of LDA before required to be zero)
+   STA $BB			;
+
 CODE_C3B9:
-   LDY $032B
-   BNE CODE_C3C1
-   STA $032B
+   LDY $032B			;same for luigi
+   BNE CODE_C3C1		;
+   STA $032B			;
    
 CODE_C3C1:
-   RTS
+   RTS				;
    
 CODE_C3C2:
    LDA $01
@@ -792,125 +795,126 @@ CODE_C402:
    STY $05FD
    RTS
    
+;get horizonal difference between mario and luigi or luigi and mario (it matters)
 CODE_C41F:
-   LDA $0329
-   STA $1F
+   LDA $0329					;horizontal difference (difference between luigi and mario
+   STA $1F					;
    
-   LDA $B9
-   JMP CODE_C430
-
+   LDA $B9					;
+   JMP CODE_C430				;
+   
 CODE_C429:
-   LDA $B9
-   STA $1F
-   LDA $0329
+   LDA $B9					;get horizontal difference (mario vs. luigi)
+   STA $1F					;
+   LDA $0329					;
    
 CODE_C430:
-   SEC
-   SBC $1F
-   BPL CODE_C43C
-   CMP #$FB
-   BCS CODE_C440
+   SEC						;
+   SBC $1F					;
+   BPL CODE_C43C				;check if on the left
+   CMP #$FB					;if it's on the right, check how much of a difference
+   BCS CODE_C440				;
    
-   LDY #$03
-   RTS
+   LDY #$03					;
+   RTS						;
    
 CODE_C43C:
-   CMP #$05
-   BCS CODE_C443
+   CMP #$05					;
+   BCS CODE_C443				;
    
 CODE_C440:
-   LDY #$02
-   RTS
+   LDY #$02					;
+   RTS						;
    
 CODE_C443:
-   LDY #$01
-   RTS
+   LDY #$01					;
+   RTS						;
    
+;Collision routine. Entity A refers to currently loaded entity in $B0 range, and entity B is in indirect addressing.
 CODE_C446:
-   LDY #$00
-   LDX #$00
+   LDY #$00					;
+   LDX #$00					;
    
 CODE_C44A:
-   STY $1C
-   STX $1D
+   STY $1C					;
+   STX $1D					;
    
-   LDA #$20
-   STA $12
+   LDA #$20					;more indirect addressing?
+   STA $12					;
    
-   LDA #$00
-   STA $13
+   LDA #$00					;
+   STA $13					;
 
 CODE_C456:
-   LDY #$00
-   LDA ($14),y
+   LDY #$00					;
+   LDA ($14),y					;if entity isn't active, return
+   BEQ CODE_C4AE				;
    
-   BEQ CODE_C4AE
-   
-   LDX #$40
-   LDY #$08
-   LDA ($14),y
-   SEC
-   SBC $B8
-   BPL CODE_C46E
-   EOR #$FF
-   CLC
-   ADC #$01
-   LDX #$80
+   LDX #$40					;set bottom bit by default (D)
+   LDY #$08					;
+   LDA ($14),y					;check vertical difference between entities
+   SEC						;
+   SBC $B8					;
+   BPL CODE_C46E				;
+   EOR #$FF					;entity A is higher than B
+   CLC						;
+   ADC #$01					;invert value
+   LDX #$80					;and set as collided from the top (U)
    
 CODE_C46E:
-   STX $1F
+   STX $1F					;
    
-   PHA
-   LDY #$1E
-   LDA ($14),y
-   CLC
-   ADC $CE
-   ADC $1D
-   STA $1E
-   PLA
+   PHA						;
+   LDY #$1E					;
+   LDA ($14),y					;entity B's hit box y-displacement.
+   CLC						;
+   ADC $CE					;entity A's hit box y-displacement.
+   ADC $1D					;height
+   STA $1E					;difference between collisions?
+   PLA						;
    
-   SEC
-   SBC $1E
-   BPL CODE_C4AE
+   SEC						;
+   SBC $1E					;
+   BPL CODE_C4AE				;
    
-   LDX #$01
-   LDY #$09
-   LDA ($14),y
-   SEC
-   SBC $B9
-   BPL CODE_C494
-   EOR #$FF
-   CLC
-   ADC #$01
-   LDX #$02
+   LDX #$01					;Left (L)
+   LDY #$09					;now X-pos
+   LDA ($14),y					;
+   SEC						;
+   SBC $B9					;check horizontal difference
+   BPL CODE_C494				;entity A's to the left of entity B.
+   EOR #$FF					;
+   CLC						;
+   ADC #$01					;
+   LDX #$02					;right (R)
    
 CODE_C494:
-   PHA
+   PHA						;
    
-   TXA
-   ORA $1F
-   STA $1F
+   TXA						;
+   ORA $1F					;store direction bits
+   STA $1F					;
    
-   LDY #$1F
-   LDA ($14),y
-   CLC
-   ADC $CF
-   ADC $1C
-   STA $1E
-   PLA
-   SEC
-   SBC $1E
+   LDY #$1F					;
+   LDA ($14),y					;Y-pos hitbox displacement
+   CLC						;
+   ADC $CF					;
+   ADC $1C					;
+   STA $1E					;
+   PLA						;
+   SEC						;
+   SBC $1E					;
    BPL CODE_C4AE
-
-   LDA $1F
-   RTS
+   LDA $1F					;if both Y and x positions match, collision test is successfull.
+   RTS						;
    
 CODE_C4AE:
-   JSR CODE_CDB4
-   DEC $11
-   BNE CODE_C456
-   LDA #$00
-   RTS
+   JSR CODE_CDB4				;change entity B
+   DEC $11					;
+   BNE CODE_C456				;loop untill all is checked
+   
+   LDA #$00					;no collision occured
+   RTS						;
    
 CODE_C4B8:
    LDA DemoFlag					;\if it's title screen and demo time
