@@ -1,5 +1,5 @@
 ;Mario Bros. (NES) Disassembly.
-;not very much documented yet.
+;not very well documented yet.
 ;But it's pretty much an accurate byte-to-byte MB. disassembly.
 ;
 ;Do note that information related with NES's architecture, PPU, APU, CPU and etc. may be incorrect, because i'm not good at understanding things. oops.
@@ -34,7 +34,7 @@
 
 RESET:
    CLD							;Disable Decimal Mode
-   SEI							;
+   SEI							;set as interrupt
    
 vblankloop:
    LDA $2002						;V-blank loop 1 to waste some cycles
@@ -44,7 +44,7 @@ vblankloop:
    STX $2000						;disable non-masked interrupt
    STX $2001						;disable rendering
    DEX							;\
-   TXS							;/iniria;ize stack
+   TXS							;/inirialize stack
    
    LDX PowHitsLeft					;load POW-block state for RNG setup
    
@@ -70,7 +70,7 @@ ResetLoop:
    LDX #$5F						;start "RNG" loop at $5F
 
 CODE_C02B:
-   STX $0500						;otherwise it starts at 1, 2 or 3 depending on POW block state before reset
+   STX RandomNumberStorage				;otherwise it starts at 1, 2 or 3 depending on POW block state before reset
    
    JSR CODE_CA1B					;clear screen(s)
    JSR CODE_CA2B					;"clear" sprite data
@@ -144,11 +144,11 @@ NMI:
    
    JSR CODE_CB58					;checks acts-like?
    JSR CODE_EE6A					;handles freezie's platform freezing
-   JSR CODE_CCFF            				;handles bumping platform from below 
+   JSR CODE_CCFF            				;handles buffered tile drawing
    JSR CODE_CA66            				;handle palette
    JSR CODE_CE09            				;keep camera still
    JSR CODE_CCC5            				;handle controllers
-   JSR CODE_CAF7    					;handle gravity and interactions?
+   JSR CODE_CAF7    					;something to do with entities
 
    LDY #$01						;"Frame has passed" flag.
    STY $20						;
@@ -2527,21 +2527,23 @@ CODE_CCD5:
    
 CODE_CCFE:
    RTS					;
-   
+
+;Draw tiles from Buffer
+;BufferedDraw_CCFF:
 CODE_CCFF:
-   LDA $21				;flag for tile update
+   LDA BufferDrawFlag			;flag for tile update
    BEQ CODE_CD42			;obviously don't do that if not set
    
-   LDA #$91				;set buffer address as indirect address
+   LDA #<BufferAddr			;set buffer address as indirect address ($91)
    STA $00				;
    
-   LDA #$05				;$0591
+   LDA #>BufferAddr			;$05
    STA $01				;
    
-   LDA $09				; 
+   LDA Reg2000BitStorage		; 
    AND #$FB				;enable any of bits except for bits 0 and 1
    STA $2000				;(which are related with nametables)
-   STA $09				;back them up
+   STA Reg2000BitStorage		;back them up
    
    LDX $2002				;prepare for PPU drawing
    
@@ -2573,9 +2575,9 @@ CODE_CD34:
    BNE CODE_CD1B			;loop if must
    
    LDA #$00				;
-   STA $0590				;
-   STA $0591				;
-   STA $21				;end draw, reset flag
+   STA BufferOffset			;
+   STA BufferAddr			;
+   STA BufferDrawFlag			;end draw, reset flag
 
 CODE_CD42:
    RTS					;
@@ -2599,10 +2601,10 @@ CODE_CD42:
 CODE_CD43:
    LDA $2002				;ready to draw
    
-   LDA $09				;\
+   LDA Reg2000BitStorage		;\
    AND #$FB				;|
    STA $2000				;|
-   STA $09				;/
+   STA Reg2000BitStorage		;/
    
    LDA #$1C				;
    CLC					;
@@ -2714,21 +2716,21 @@ CODE_CDB4:
 ;$2000, $2002, $2006, $2007
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-CODE_CDC4:				;
+CODE_CDC4:
    STA $2006				;load locations for tile to draw
    INY					;
 
-   LDA ($00),y				; low byte
+   LDA ($00),y				;low byte
    STA $2006				;
    INY					;
 
    LDA ($00),y				;
    ASL A				;
    PHA					;
-   LDA $09
-   ORA #$04
-   BCS CODE_CDDA
-   AND #$FB
+   LDA Reg2000BitStorage		;
+   ORA #$04				;enable drawing in a verical line
+   BCS CODE_CDDA			;
+   AND #$FB				;or disable it (on bit 7)
    
 CODE_CDDA:
    STA $2000
@@ -2767,16 +2769,17 @@ CODE_CE00:
    LDA ($00),y
    BNE CODE_CDC4
 
-;layout routine basically ends here, it flows into this routine (it's called from NMI)
 
+;Restore camera position after messing with VRAM
 CODE_CE09:   
    PHA
-   LDA $0B
-   STA $2005
-   LDA $0C
-   STA $2005
-   PLA
-   RTS
+   LDA CameraPosY			;restore camera position
+   STA $2005				;
+
+   LDA CameraPosX			;
+   STA $2005				;
+   PLA					;
+   RTS					;
 
 CODE_CE16:
    LDA #$00				;set up address we're copying data to      
@@ -2789,8 +2792,8 @@ CODE_CE16:
    DEY					;-1
    LDX $02				;load amount of bytes to copy
 
-;this routine is used to store data from one area of addresses to another (from ROM to RAM or RAM to RAM)
-;it's only called from one place in ROM, which is a shame.
+;this routine is used to copy data from one area of addresses to another (from ROM to RAM or RAM to RAM)
+;there's only a single JSR for this.
 
 CODE_CE23:
    LDA ($00),Y				;
@@ -2799,85 +2802,89 @@ CODE_CE23:
    DEX					;
    BNE CODE_CE23			;
    RTS					;
-   
-CODE_CE2C:
-   LDA #$01				;enable drawing for bump tiles/POW tiles (in NMI)
-   STA $21
-   
-   LDY #$00
-   LDA ($02),Y              
-   AND #$0F
-   STA $05
 
-   LDA ($02),Y              
-   LSR A
-   LSR A
-   LSR A 
-   LSR A      
-   STA $04
+;Set up buffered write.
+;Used by things such as POW block and score updates.
+
+CODE_CE2C:
+   LDA #$01				;enable drawing for various tiles (in NMI via buffer)
+   STA BufferDrawFlag			;
    
-   LDX $0590
+   LDY #$00				;
+   LDA ($02),Y				;number of bytes to update on a single row
+   AND #$0F				;
+   STA $05				;
+
+   LDA ($02),Y				;number of rows to update        
+   LSR A				;
+   LSR A				;
+   LSR A				;
+   LSR A				;
+   STA $04				;
+   
+   LDX BufferOffset			;get buffer offset if any
 
 CODE_CE43:   
-   LDA $01
-   STA $0591,X
+   LDA $01				;VRAM position, high byte
+   STA BufferAddr,X			;
    
-   JSR CODE_CE84
+   JSR CODE_CE84			;
    
-   LDA $00                  
-   STA $0591,X
+   LDA $00				;VRAM position, low byte
+   STA BufferAddr,X			;
    
-   JSR CODE_CE84
+   JSR CODE_CE84			;
    
-   LDA $05         
-   STA $06      
-   STA $0591,X 
+   LDA $05				;number of tiles to draw
+   STA $06				;set up a loop
+   STA BufferAddr,X 			;and save that information in the buffer.
    
 CODE_CE5A:
-   JSR CODE_CE84
+   JSR CODE_CE84			;
    
-   INY                      
-   LDA ($02),Y              
-   STA $0591,X              
-   DEC $06                  
-   BNE CODE_CE5A
-   JSR CODE_CE84
+   INY					;get those tiles in the buffer
+   LDA ($02),Y				;
+   STA BufferAddr,X			;
+
+   DEC $06				;keep looping untill all bytes are in the buffer  
+   BNE CODE_CE5A			;
+   JSR CODE_CE84			;
    
-   STX $0590         
-   CLC                      
-   LDA #$20  
-   ADC $00                  
-   STA $00
+   STX BufferOffset			;store current buffer offset
+   CLC					;
+   LDA #$20				;add + $20 to the VRAM position, so it's the next row
+   ADC $00				;
+   STA $00				;
    
-   LDA #$00                 
-   ADC $01                  
-   STA $01
+   LDA #$00				;high byte  
+   ADC $01				;
+   STA $01				;
    
-   DEC $04                  
-   BNE CODE_CE43
+   DEC $04				;check number of rows
+   BNE CODE_CE43			;if not all, keep loopin'
    
-   LDA #$00                 
-   STA $0591,X              
-   RTS
+   LDA #$00				;put an end for buffered write.  
+   STA BufferAddr,X			;
+   RTS					;
 
 CODE_CE84:   
-   INX                      
-   TXA
+   INX					;write next buffer byte
+   TXA					;transfer into X for the next check
 
 CODE_CE86:   
-   CMP #$2F                 
-   BCC CODE_CE94
+   CMP #$2F				;check if there's too much to update
+   BCC CODE_CE94			;if not, moving on
    
-   LDX $0590
+   LDX BufferOffset			;get current buffer offset
    
-   LDA #$00                 
-   STA $0591,X 
+   LDA #$00				;and cut this particular update out
+   STA BufferAddr,X			;maybe for the next time
    
-   PLA                      
-   PLA
+   PLA					;terminate call             
+   PLA					;
 
 CODE_CE94:   
-   RTS
+   RTS					;
 
 CODE_CE95:
    LDA $B1                  
@@ -3260,7 +3267,7 @@ CODE_D03F:
 CODE_D083:
    DEX
    
-   LDA $90,Y              
+   LDA $90,Y
    AND #$0F                 
    STA $0591,X
    
@@ -3501,9 +3508,6 @@ CODE_D1A9:
    BCS CODE_D1FA
    
    LDA $90,Y
-   
-   ;.db $20,$5A,$D1,$B0,$30,$B9,$90,$00
-   
    BNE CODE_D1FF
   
 CODE_D1CF:
@@ -3894,12 +3898,12 @@ CODE_D3A8:
    STA $45                  
    STA $46
    
-   LDX #$03
+   LDX #$03				;reset sound addresses
    
 CODE_D3C6:
-   STA $FC,X                
-   DEX                      
-   BPL CODE_D3C6
+   STA $FC,X				;
+   DEX					;
+   BPL CODE_D3C6			;
    
    LDA $30                  
    BNE CODE_D3F5
@@ -4001,14 +4005,14 @@ CODE_D450:
    RTS					;
    
 CODE_D451:
-   LDA $2D                  
-   BNE CODE_D459
+   LDA $2D				;timer to update scores?
+   BNE CODE_D459			;
    
    LDA #$04                 
    BNE CODE_D47A
    
 CODE_D459:
-   JMP CODE_E1F7
+   JMP CODE_E1F7			;update score tiles (store to buffer)
    
 CODE_D45C:
    LDA $2B                  
@@ -6561,7 +6565,7 @@ CODE_E1F6:
    RTS
    
 CODE_E1F7:
-   LDA $21                  
+   LDA $21
    BNE CODE_E219
    
    LDA $04C5                
@@ -9344,10 +9348,14 @@ DATA_F4F5:
 .db $46,$23,$3C,$04,$4A,$4B,$4B,$4B
 .db $00
 
+;POW Block update data
+;used for buffered write.
+
 DATA_F560:
-.db $22,$24,$24,$24,$24,$22,$FE,$FF
-.db $90,$91,$22,$FC,$FD,$8E,$8F,$22
-.db $FA,$FB,$8C,$8D
+.db $22,$24,$24,$24,$24			;No POW block
+.db $22,$FE,$FF,$90,$91			;hit twice
+.db $22,$FC,$FD,$8E,$8F			;hit once
+.db $22,$FA,$FB,$8C,$8D			;full POW block
  
 DATA_F574:
 .db $2D
