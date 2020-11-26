@@ -87,7 +87,7 @@ CODE_C02B:
    
    LDA #$90						;enable VBlank (NMI) and background
    STA $2000						;
-   STA $09						;backup enabled bits
+   STA Reg2000BitStorage				;backup enabled bits
    
    LDA #$06						;Bits 1 and 2 to be enabled for 2001
    STA Reg2001BitStorage				;which are "background left column enable" and "sprite left column enable"
@@ -111,16 +111,16 @@ CODE_C060:
    JSR CODE_C4B8					;handle gamemodes
 
    LDA #$01						;
-   STA $22						;
+   STA NMI_FunctionsDisableFlag				;can run interrupt code safely
 
 CODE_C06A:
    LDA $20						;if in frame hasn't passed
    BEQ CODE_C077					;do other things
 
-   INC $2F						;increase frame counter, well, every frame (duh)
+   INC FrameCounter					;increase frame counter, well, every frame (duh)
    
    LDA #$00						;
-   STA $22						;"Disables" NMI
+   STA NMI_FunctionsDisableFlag				;"Disables" NMI
    JMP CODE_C04F					;run some routines that update things every frame, like sounds and stuff
    
 CODE_C077:
@@ -139,8 +139,8 @@ NMI:
    LDA #$02						;|
    STA $4014						;/
    
-   LDA $22						;some sort of "update" flag that allows NMI to update things
-   BEQ CODE_C0AC					;although it doesn't do much in practice.
+   LDA NMI_FunctionsDisableFlag				;don't screw anything up and skip everything in case it occured during lag (that could lead to bugs mostly due to changes in scratch RAM)
+   BEQ CODE_C0AC					;
    
    JSR CODE_CB58					;checks acts-like?
    JSR CODE_EE6A					;handles freezie's platform freezing
@@ -920,15 +920,15 @@ CODE_C4B8:
    LDA DemoFlag					;\if it's title screen and demo time
    BNE CODE_C528				;/don't run gameplay (or do, but from different pointers)
    
-   LDA $18					;\if start button is pressed, start game
-   AND #$10					;|
+   LDA Controller1InputHolding			;\if start button is pressed, start game
+   AND #Input_Start				;|
    BEQ CODE_C507				;/
    
-   LDY $26					;\prevent start from pausing/unpausing when it's held (only when pressed)
+   LDY Pause_HeldPressed			;\prevent start from pausing/unpausing when it's held (only when pressed)
    BNE CODE_C50B				;/
    
    INY						;\no INC $26? Sad day
-   STY $26					;/
+   STY Pause_HeldPressed			;/
    
    LDY GameplayMode				;if game was paused
    CPY #$05					;
@@ -952,15 +952,15 @@ CODE_C4D9:
    STA $2001					;|
    STA Reg2001BitStorage			;/
 
-   STY $3B					;back-up gamemode
+   STY GameplayModeBackup			;back-up gamemode
 
    LDA #$05					;\gamemode = paused
    STA GameplayMode				;/
 
    LDA #$00					;\disable some sound effects
-   STA $FF					;|
-   STA $FE					;|
-   STA $FC					;/
+   STA Sound_Effect2				;|
+   STA Sound_Effect				;|
+   STA Sound_Loop				;/
    BEQ CODE_C501				;play pause sound effect
    
 CODE_C4F9:
@@ -971,13 +971,13 @@ CODE_C4F9:
    STA GameplayMode				;/
    
 CODE_C501:
-   LDA #$08					;\play pause sound effect
-   STA $FD					;/
+   LDA #Sound_Jingle_Pause			;\play pause sound effect
+   STA Sound_Jingle				;/
    BNE CODE_C50B				;run gamemode
    
 CODE_C507:
    LDA #$00					;player can press start
-   STA $26					;
+   STA Pause_HeldPressed			;
    
 CODE_C50B:
    LDA GameplayMode				;another gamemode pointer? this time for actual gameplay
@@ -995,19 +995,19 @@ DATA_C510:
    .dw CODE_D5E5				;return
    
    .dw CODE_D451				;phase start
-   .dw CODE_E129				;wait for next phase to begin (after clearing all enemies)
+   .dw CODE_E129				;wait for next phase to begin/to take coint count for TEST YOUR SKILL
    .dw CODE_D45C				;unpause
    .dw CODE_E28B				;game over
 
 CODE_C528:
-   LDA $18					;
-   AND #$30					;
-   CMP #$10					;if player pressed start, start the game
+   LDA Controller1InputHolding			;
+   AND #Input_Select|Input_Start		;
+   CMP #Input_Start				;if player pressed start, start the game
    BNE CODE_C543				;
    
    LDA #$00					;\
-   STA $30					;|reset demo flag
-   STA $40					;/initialize gameplay
+   STA DemoFlag					;|reset demo flag
+   STA GameplayMode				;/initialize gameplay
    
    JSR CODE_D4FE				;
    JSR CODE_E132				;
@@ -1018,17 +1018,17 @@ CODE_C528:
    RTS						;
    
 CODE_C543:
-   LDX $50					;\if it's title screen init
+   LDX NonGameplayMode				;\if it's title screen init
    BEQ CODE_C58E				;/don't check things
-   CMP #$20                 			;\check if pressed select
+   CMP #Input_Select                 		;\check if pressed select
    BNE CODE_C568                		;/
    CPX #$01                 			;\if select was pressed, but it's not a title screen
    BNE CODE_C561				;/return to title screen
    
-   LDA $28					;don't repeatidly move cursor (if holding select)
+   LDA TitleScreen_SelectHeldFlag 		;don't repeatidly move cursor (if holding select)
    BNE CODE_C574				;
-   
-   LDY $29					;move cursor 
+  
+   LDY Cursor_Option				;move cursor 
    INY						;
    CPY #$04                 			;
    BNE CODE_C55C				;
@@ -1036,25 +1036,25 @@ CODE_C543:
    LDY #$00					;if cursor was on last entry, wrap around
    
 CODE_C55C:
-   STY $29					;cursor's position
+   STY Cursor_Option				;cursor's position
    JMP CODE_C570				;
 
 CODE_C561:
    JSR CODE_D4FE				;mute sounds (not that they play during demo anyways...)
    
-   STA $50					;initialize title screen
+   STA NonGameplayMode				;initialize title screen
    BEQ CODE_C58E				;
 
 CODE_C568:   
    CMP #$00					;if we pressed select
    BNE CODE_C570				;move only once per press
    
-   STA $28					;if not holding/pressing select anymore, can move again
+   STA TitleScreen_SelectHeldFlag 		;if not holding/pressing select anymore, can move again
    BEQ CODE_C57E				;
 
 CODE_C570:  
    LDA #$01					;can't move cursor
-   STA $28					;
+   STA TitleScreen_SelectHeldFlag 		;
    
 CODE_C574:
    LDA $2D					;keep timer if moving cursor
@@ -1068,17 +1068,17 @@ CODE_C57E:
    CPX #$01					;\don't handle cursor if it's not title screen
    BNE CODE_C58E				;/
    
-   LDA $29					;\handle cursor's position
+   LDA Cursor_Option				;\handle cursor's position
    ASL A					;|
    ASL A					;|
    ASL A					;|
    ASL A					;|
    CLC						;|
    ADC #$80					;|
-   STA $0200					;/
+   STA Cursor_OAM_Y				;/
  
 CODE_C58E:   
-   LDA $50  					;\Set up pointers based on $50 value                
+   LDA NonGameplayMode  			;\execute some              
    JSR CODE_CD9E				;/
 
 ;Title screen and demo pointers
@@ -1087,8 +1087,8 @@ DATA_C593:
    .dw CODE_D40B				;loading title screen
    .dw CODE_D47D				;title screen
    .dw CODE_D491				;initialize demo
-   .dw CODE_D496				;build phase (and more initialization)
-   .dw CODE_D49B				;same as before?
+   .dw CODE_D496				;more init
+   .dw CODE_D49B				;build phase (and more initialization)
    .dw CODE_D4A0				;enable screen display
    .dw CODE_D4AF				;playing title screen demo recording (or actual gameplay?)
    .dw CODE_D448				;reset pointer
@@ -1103,7 +1103,7 @@ CODE_C5A3:					;
    JSR CODE_EA31                
    JSR CODE_E795    
    JSR CODE_EDEB                
-   JSR CODE_E2AB                
+   JSR CODE_E2AB				;TEST YOUR SKILL related?
    JSR CODE_E21A
    JSR CODE_E1F7                
    JSR CODE_DFF8                
@@ -2421,13 +2421,13 @@ CODE_CC5F:
    STX $05FA
 
 CODE_CC73:
-   LDA $B8                  
-   CLC                      
-   ADC #$08                 
-   CMP #$E4
-   BCC CODE_CC84
+   LDA CurrentEntity_YPos			;
+   CLC						;
+   ADC #$08					;
+   CMP #$E4					;check if current entity is low enough
+   BCC CODE_CC84				;if not, well
    
-   LDA #$00                 
+   LDA #$00					;IDK what this is supposed to be. i think this is supposed to hide entity that's attempting to spawn in (if the same pipe is used by  different entity) but again IDK
    STA $01
    
    LDA #$20                 
@@ -2436,7 +2436,7 @@ CODE_CC73:
 CODE_CC84:
    STA $01
    
-   LDA $B9                  
+   LDA CurrentEntity_XPos
    STA $00                  
    JSR CODE_CA7D
    
@@ -2768,7 +2768,6 @@ CODE_CE00:
    LDY #$00
    LDA ($00),y
    BNE CODE_CDC4
-
 
 ;Restore camera position after messing with VRAM
 CODE_CE09:   
@@ -3292,57 +3291,64 @@ CODE_D0A2:
    AND #$01                 
    BEQ CODE_D0B3
    
-   LDY $02                  
-   CLC                      
-   LDA $90,Y              
-   ADC #$37                 
-   STA $0591,X
+   LDY $02				;\untriggered
+   CLC					;|
+   LDA $90,Y				;|
+   ADC #$37				;|
+   STA $0591,X				;/
   
 CODE_D0B3:
    RTS
-   
+
+;score related
+;Input:
+;$05 - Hundreds and tens thousands to add
+;$06 - Thousands and hundreds to add
+;$07 - Tens and ones to add
+;A - score address offset, where 0 - mario and 1 - luigi
+
 CODE_D0B4:
-   AND #$07                 
-   ASL A                    
-   ASL A                    
-   TAX
+   AND #$07				;get some bits (IDK why)
+   ASL A				;
+   ASL A				;x4 to get correct score address
+   TAX					;into X
    
-   LDA $04                  
-   BEQ CODE_D0E4
+   LDA $04				;some flag thats never set?
+   BEQ CODE_D0E4			;
    
-   LDA $94,X                
-   BEQ CODE_D0E8
+   LDA $94,X				;\untriggered
+   BEQ CODE_D0E8			;/
    
 CODE_D0C1:
-   CLC                      
-   LDA $97,X                
-   STA $03
+   CLC					;
+   LDA $97,X				;store original value before calculation into $03
+   STA $03				;
    
-   LDA $07                  
-   JSR CODE_D139                
-   STA $97,X
+   LDA $07				;
+   JSR CODE_D139			;calculate tens and ones
+   STA $97,X				;
 
-   LDA $96,X                
-   STA $03
+   LDA $96,X				;now calculate hundreds and thousands
+   STA $03				;
 
-   LDA $06                  
-   JSR CODE_D139                
-   STA $96,X
+   LDA $06				;
+   JSR CODE_D139			;
+   STA $96,X				;
    
-   LDA $95,X                
-   STA $03
+   LDA $95,X				;and tens and ones
+   STA $03				;
    
-   LDA $05                  
-   JSR CODE_D139                
-   STA $95,X                
-   RTS
+   LDA $05				;
+   JSR CODE_D139			;
+   STA $95,X				;
+   RTS					;
 
 CODE_D0E4:  
-   LDA $94,X                
+   LDA $94,X				;need to find out what this is
    BEQ CODE_D0C1
 
 CODE_D0E8:   
-   SEC                      
+   SEC
    LDA $97,X                
    STA $03
    
@@ -3397,32 +3403,39 @@ CODE_D11C:
   
 CODE_D138:
    RTS
-  
+
+;Calculate counter value, like score
+;Input:
+;$03 - original value to add to
+;A - value to add
+;Output:
+;A - result
+;Carry - if next calculation in this routine should have a +1 to low digit
 CODE_D139:
-   JSR CODE_D17C                
-   ADC $01                  
-   CMP #$0A                 
-   BCC CODE_D144                
-   ADC #$05
+   JSR CODE_D17C			;
+   ADC $01				;
+   CMP #$0A				;if value less than A
+   BCC CODE_D144			;don't round
+   ADC #$05				;by adding 6 (incluing carry)
   
 CODE_D144:
-   CLC                      
-   ADC $02                  
-   STA $02                  
-   LDA $03                  
-   AND #$F0                 
-   ADC $02                  
-   BCC CODE_D155
+   CLC					;
+   ADC $02				;
+   STA $02				;
+   LDA $03				;tens/thousands/ten thousands
+   AND #$F0				;
+   ADC $02				;and additional ten/whatev
+   BCC CODE_D155			;overflow?
 
 CODE_D151:   
-   ADC #$5F                 
-   SEC                      
-   RTS
+   ADC #$5F				;+$60 (w/ right next)
+   SEC					;and +1 for the next calculation (thats + $160)
+   RTS					;
 
 CODE_D155:   
-   CMP #$A0
-   BCS CODE_D151
-   RTS
+   CMP #$A0				;hundreds and etc?
+   BCS CODE_D151			;if so, add more + 10 AND 100
+   RTS					;otherwise return
 
 CODE_D15A:
    JSR CODE_D17C                
@@ -3450,16 +3463,16 @@ CODE_D179:
    RTS                      
    
 CODE_D17C:
-   PHA                      
-   AND #$0F                 
-   STA $01                  
-   PLA                      
-   AND #$F0                 
-   STA $02
+   PHA					;
+   AND #$0F				;
+   STA $01				;save low digit
+   PLA					;
+   AND #$F0				;and high digit
+   STA $02				;
 
-   LDA $03                  
-   AND #$0F                 
-   RTS
+   LDA $03				;calculate low digit of value we're about to calculate
+   AND #$0F				;
+   RTS					;
 
 CODE_D18B:   
    LDA #$00                 
@@ -3668,10 +3681,10 @@ CODE_D27F:
    LDA $74,Y              
    STA $01
    
-   LDA #$40   
+   LDA #<BumpTileBuffer			;$40   
    STA $02
    
-   LDA #$05                 
+   LDA #>BumpTileBuffer			;$05                 
    STA $03
    
    JSR CODE_CE2C                
@@ -3788,11 +3801,11 @@ CODE_D31F:
    RTS
    
 CODE_D328:
-   LDA $0500				;Random number data pool... i think
+   LDA RandomNumberStorage		;Random number
    AND #$02				;
-   STA $07				;
+   STA $07				;something to make it a little more "random"
    
-   LDA $0501				;random number
+   LDA $0501				;Random number
    AND #$02				;
    EOR $07				;
    CLC					;
@@ -3800,12 +3813,12 @@ CODE_D328:
    SEC					;
 
 CODE_D33A:
-   ROR $0500				;
-   ROR $0501				;
-   ROR $0502				;
-   ROR $0503				;
+   ROR RandomNumberStorage		;
+   ROR RandomNumberStorage+1		;
+   ROR RandomNumberStorage+2		;
+   ROR RandomNumberStorage+3		;
 
-   LDA $0500				;$0500 contains random number
+   LDA RandomNumberStorage		;$0500 contains random number (i don't think output matters)
    RTS
    
 CODE_D34A:				;
@@ -3833,7 +3846,7 @@ CODE_D34A:				;
    JMP CODE_D37D			;demo always has 2 players
    
 CODE_D36D:
-   LDA $29				;if game mode is 2 Players mode
+   LDA Cursor_Option			;if game mode is 2 Players mode
    CMP #$02				;
    BCS CODE_D37D			;set lives for second player as well
    
@@ -3852,7 +3865,7 @@ CODE_D37D:
 CODE_D381:
    STY $4E				;either disable or enable 2nd player sprite
    STY $AE				;?
-   STA $39				;disable or enable second player's score display (not sure how it works)
+   STA TwoPlayerModeFlag		;set a flag for 2 Player mode
    
    LDA #$00				;reset gameover flag for both mario and luigi
    STA $49				;
@@ -3866,7 +3879,7 @@ CODE_D38F:
    BPL CODE_D38F			;
    
    LDY #$00				;\check if it's game A or B
-   LDA $29				;|check chosen option
+   LDA Cursor_Option			;|check chosen option
    BEQ CODE_D39F			;|0 - Game A was chosen
    CMP #$02				;|
    BEQ CODE_D39F			;|2 - Game A 2 Players was chosen
@@ -3954,15 +3967,15 @@ CODE_D40B:
    JSR CODE_CA20            		;clear screen
    JSR CODE_CA2B			;clear OAM
    
-   LDX #$A5				;draw title screen behind scenes
-   LDY #$F0				;
+   LDX #<DATA_F0A5			;$A5 draw title screen behind scenes
+   LDY #>DATA_F0A5			;$F0
    JSR CODE_D5D5			;
    
    LDA #$02				;use title screen's palettes    
    STA PaletteFlag			;
    
    LDA #$01				;makes cursor move when select is pressed (not held)
-   STA $28				;
+   STA TitleScreen_SelectHeldFlag	;
    
    LDA #<DATA_F689			;setup for cursor sprite
    STA $00				;
@@ -3974,12 +3987,12 @@ CODE_D40B:
    STA $02				;
    JSR CODE_CE16			;
    
-   INC $50				;next pointer
+   INC NonGameplayMode			;next pointer (show title screen)
    
    LDY $52				;if it shouldn't play title screen song (or again, after demo ends)
    BNE CODE_D440			;wait for next time
    
-   LDY #$02				;don't play music after demo plays a coupld of times
+   LDY #$02				;don't play music after demo plays a couple of times
    STY $52				;
    
    LDA #$4F				;play music
@@ -3999,7 +4012,7 @@ CODE_D448:
    BNE CODE_D450			;
    
    LDA #$00				;reset pointer, initialize title screen
-   STA $50				;
+   STA NonGameplayMode			;
 
 CODE_D450:
    RTS					;
@@ -4008,7 +4021,7 @@ CODE_D451:
    LDA $2D				;timer to update scores?
    BNE CODE_D459			;
    
-   LDA #$04                 
+   LDA #$04				;set gameplay mode to #$04 - slight pause?
    BNE CODE_D47A
    
 CODE_D459:
@@ -4035,10 +4048,10 @@ CODE_D471:
    DEX                      
    BPL CODE_D471
 
-   LDA $3B
+   LDA GameplayModeBackup
    
 CODE_D47A:
-   STA $40
+   STA GameplayMode
    
 CODE_D47C:
    RTS
@@ -4049,8 +4062,8 @@ CODE_D47D:
    CPY #$4B				;if it should play title screen music (after reset/after demo plays a couple of times), well
    BNE CODE_D48D			;
    
-   LDA #$80				;queue title screen music
-   STA $FD				;
+   LDA #Sound_Jungle_TitleScreen	;queue title screen music
+   STA Sound_Jingle			;
 
    LDY #$48				;and set timer, huh?
    STY $2D				;
@@ -4059,25 +4072,25 @@ CODE_D48D:
    RTS					;
 
 CODE_D48E:
-   INC $50				;
+   INC NonGameplayMode			;start demo (initialization)
    RTS					;
    
 CODE_D491:
-   INC $50				;next pointer
-   JMP CODE_D34A			;jump to existing pointer used during actual gameplay (initialize some variables)
+   INC NonGameplayMode			;more init
+   JMP CODE_D34A			;jump to existing pointer used during phase initialization
 
 CODE_D496:   
-   INC $50				;next pointer
-   JMP CODE_E14A			;used by gameplay pointer as well, build phase
+   INC NonGameplayMode			;play demo after initialization
+   JMP CODE_E14A			;more phase initialization
    
 CODE_D49B:
-   INC $50
-   JMP CODE_D3F9
+   INC NonGameplayMode			;
+   JMP CODE_D3F9			;even more init!
    
 CODE_D4A0:
-   INC $50
+   INC NonGameplayMode			;finish init, goddammit!
    
-   LDA #$00                 
+   LDA #$00				;timer mirrors or w/e
    STA $55                  
    STA $56                  
    STA $57                  
@@ -4089,11 +4102,11 @@ CODE_D4AF:
    LDY $56
    BNE CODE_D4CA
    
-   LDX $55                  
-   LDA DATA_F823,X              
-   CMP #$AA                 
-   BEQ CODE_D4F8
-   STA $19
+   LDX $55				;demo movement offset
+   LDA DATA_F823,X
+   CMP #Demo_EndCommand			;if should end demo
+   BEQ CODE_D4F8			;end demo (duh)
+   STA Controller1InputPress
    
    INX                      
    LDA DATA_F823,X              
@@ -4116,7 +4129,7 @@ CODE_D4D4:
    
    LDX $57                  
    LDA DATA_F854,X              
-   STA $1B                  
+   STA Controller2InputPress
    INX                      
    LDA DATA_F854,X              
    STA $58                  
@@ -4128,7 +4141,7 @@ CODE_D4EB:
    DEY                      
    STY $58
    
-   LDA $0330                
+   LDA $0330
    AND #$03                 
    STA $1B
   
@@ -4139,17 +4152,18 @@ CODE_D4F8:
    LDA #$05                 
    STA $2D
 
-   INC $50                                     
-   
+   INC NonGameplayMode
+
+;MuteSounds_D4FE
 CODE_D4FE:
-   LDA #$00
-   LDX #$03
+   LDA #$00				;store zero to all addresses
+   LDX #$03				;loop through all sound addresses
 
 CODE_D502:
-   STA $FC,x
-   DEX
-   BPL CODE_D502
-   RTS
+   STA Sound_Loop,x			;loop through sound addresses
+   DEX					;
+   BPL CODE_D502			;
+   RTS					;
 
 CODE_D508:
    JSR CODE_CA3B			;write attributes
@@ -4212,7 +4226,7 @@ CODE_D54F:
    JSR CODE_D5D5                
    JSR CODE_D58C                
    JSR CODE_D593                
-   JSR CODE_D5BE
+   JSR CODE_D5BE			;HUD init
    
    LDA #$00                 
    LDX #$09
@@ -4251,7 +4265,8 @@ CODE_D58C:
    LDX #<DATA_F4F5			;$F5                 
    LDY #>DATA_F4F5			;$F4                 
    JMP CODE_D5D5                
-   
+
+;This code sets POW block upon loading the phase based on number of hits
 CODE_D593:
    LDA PowHitsLeft			;POW hits
    ASL A				;
@@ -4281,20 +4296,21 @@ CODE_D593:
    
    LDA $15				;
    STA $03				;
-   JMP CODE_CE2C			;
+   JMP CODE_CE2C			;draw POW block (or the lack of it)
 
+;This routine draws HUD during phase initialization (not the score values)
 CODE_D5BE:
-   LDX #$60                 
-   LDY #$F6                 
-   JSR CODE_D5D5
+   LDX #<DATA_F660			;$60                 
+   LDY #>DATA_F660			;$F6                 
+   JSR CODE_D5D5			;draw part of the HUD
    
-   LDA #$01                 
+   LDA #$01
    STA $9D
    
-   LDA $39                  
-   BEQ CODE_D5E5
+   LDA TwoPlayerModeFlag		;check if in 2 player mode
+   BEQ CODE_D5E5			;
    
-   LDA #$01                 
+   LDA #$01
    STA $9E
    
    LDX #<DATA_F66B			;$6B
@@ -5362,27 +5378,28 @@ CODE_DB4A:
    RTS
    
 CODE_DB53:
-   LDY $33                  
+   LDY $33
    DEY                      
    BEQ CODE_DB33
    STY $11
    
-   LDA $2F                  
+   LDA FrameCounter			;run something every other frame
    AND #$01                 
-   BNE CODE_DB6B                
+   BNE CODE_DB6B
+    
    CPY #$03                 
    BEQ CODE_DB6A                
    CPY #$04                 
-   BEQ CODE_DB6A                
+   BEQ CODE_DB6A			;this line is unecessary btw 
    BNE CODE_DB73
   
 CODE_DB6A:
    RTS
 
-CODE_DB6B:  
-   CPY #$03                 
-   BEQ CODE_DB73                
-   CPY #$04                 
+CODE_DB6B:
+   CPY #$03 
+   BEQ CODE_DB73  
+   CPY #$04
    BNE CODE_DB6A
 
 CODE_DB73:  
@@ -5988,7 +6005,7 @@ CODE_DE9A:
    LDA $00                  
    STA $06,X                
    LDA $01                  
-   JMP CODE_D0B4                
+   JMP CODE_D0B4
    
 CODE_DEA3:
    LDX #$1F
@@ -6144,14 +6161,14 @@ CODE_DF60:
    
 CODE_DF6C:
    LDA #$18                 
-   STA $B6                  
+   STA $B6
    BNE CODE_DF75
   
 CODE_DF72:
    JSR CODE_CEA3
-  
+
 CODE_DF75:
-   LDA #$00                 
+   LDA #$00			;remove entity?
    STA $C6
    STA $B3
 
@@ -6295,7 +6312,7 @@ CODE_E023:
    LDA $0300                
    BNE CODE_E058
    
-   LDA $39                  
+   LDA TwoPlayerModeFlag		;check for player 2
    BEQ CODE_E03C
    
    LDA $4E                  
@@ -6310,7 +6327,6 @@ CODE_E03C:
    
    LDA #$FF                 
    STA $4A
-
    
 CODE_E044:
    LDA #$FF                		 ;
@@ -6411,11 +6427,11 @@ DATA_E0D0:
 .db $00
    
 CODE_E129:
-   LDA $2D                  
-   BNE CODE_E131
+   LDA $2D				;check for timer
+   BNE CODE_E131			;return if ticking
    
-   LDA $3B                  
-   STA $40
+   LDA GameplayModeBackup		;\restore gameplay mode
+   STA GameplayMode			;/
    
 CODE_E131:
    RTS                      
@@ -6708,24 +6724,24 @@ CODE_E2AA:
    RTS
   
 CODE_E2AB:
-   LDA $04B0
+   LDA $04B0				;check TEST YOUR SKILL flag
    BNE CODE_E2B1
    RTS
 
 CODE_E2B1:
-   CMP #$01                 
-   BNE CODE_E329
+   CMP #$01				;if initialized
+   BNE CODE_E329			;run TEST YOUR SKILL!
    
-   LDA #$40                 
-   STA $14
+   LDA #<Entity_Address+$40		;initialize coins starting from entity $02
+   STA EntityDataPointer
    
-   LDA #$03                 
-   STA $15
+   LDA #>Entity_Address
+   STA EntityDataPointer+1				;the address 
    
    LDA #$20                 
    STA $12
    
-   LDA #$00                 
+   LDA #$00     
    STA $13
    
    LDA #$0A                 
@@ -6771,7 +6787,7 @@ CODE_E2F6:
    LDA DATA_E6E5+2,X
 
 CODE_E2FD:
-   STA ($14),Y              
+   STA (EntityDataPointer),Y              
    INY                      
    CPY #$20                 
    BNE CODE_E2D1
@@ -6794,9 +6810,9 @@ CODE_E2FD:
    LDA #$01                 
    STA $04B2
    
-   LDA #$0A                 
-   STA $04BC                
-   INC $04B0                
+   LDA #$0A				;max coins?
+   STA $04BC				;
+   INC $04B0				;don't init, animate (i think)
    RTS     
   
 CODE_E329:
@@ -6822,7 +6838,7 @@ CODE_E333:
    STA $3B
    
    LDA #$09                 
-   STA $40                  
+   STA GameplayMode
    RTS                      
 
 CODE_E34E:
@@ -6882,10 +6898,10 @@ CODE_E374:
    LDA #$20                 
    STA $01
    
-   LDA #$40                 
+   LDA #<BumpTileBuffer			;$40                 
    STA $02
    
-   LDA #$05                 
+   LDA #>BumpTileBuffer			;$05                 
    STA $03                  
    JSR CODE_CE2C
   
@@ -6938,7 +6954,7 @@ CODE_E3E3:
    BNE CODE_E3C7
    
    LDA $04BC                
-   BNE CODE_E3F2                
+   BNE CODE_E3F2
    JMP CODE_E333
 
 CODE_E3F2:   
@@ -7014,30 +7030,30 @@ CODE_E453:
    JSR CODE_CD9E		;execute pointers
 
 DATA_E45C:
-.dw CODE_E464			;bonus end init
-.dw CODE_E48A			;give coins
-.dw CODE_E49A			;wait for result
-.dw CODE_E4AA			;bonus/no bonus
+.dw CODE_E464				;bonus end init
+.dw CODE_E48A				;give coins
+.dw CODE_E49A				;wait for result
+.dw CODE_E4AA				;bonus/no bonus
 
 CODE_E464:
-   JSR CODE_E132		;turn off rendering & wait for NMI to occur
-   JSR CODE_CA20		;clear screen
-   JSR CODE_CA3B		;write stuff 
-   JSR CODE_CA2B		;clear OAM
-   JSR CODE_D5BE		;write score bar 
-   JSR CODE_D60F		;prepare OAM slots for lives
-   JSR CODE_D5E6		;set Mario's lives Y-position
-   JSR CODE_D5EC		;same for Luigi
-   JSR CODE_E13D		;wait for NMI and enable rendering
+   JSR CODE_E132			;turn off rendering & wait for NMI to occur
+   JSR CODE_CA20			;clear screen
+   JSR CODE_CA3B			;write stuff 
+   JSR CODE_CA2B			;clear OAM
+   JSR CODE_D5BE			;draw some HUD elements
+   JSR CODE_D60F			;prepare OAM slots for lives
+   JSR CODE_D5E6			;set Mario's lives Y-position
+   JSR CODE_D5EC			;same for Luigi
+   JSR CODE_E13D			;wait for NMI and enable rendering
    
-   LDA #$00			;zero out RAM addresses for next state
-   STA $04BA			;to be investigated what they're for
-   STA $2B			;
+   LDA #$00				;zero out RAM addresses for next state
+   STA $04BA				;to be investigated what this is for
+   STA $2B				;timer
 
-   INC $04B4			;to the next state
+   INC TESTYOURSKILL_CoinCountPointer	;to the next state
 
 CODE_E489:   
-   RTS				;
+   RTS					;
    
 CODE_E48A:
    LDA $2B                  
@@ -7967,18 +7983,19 @@ CODE_EA31:
    
 CODE_EA36:
    RTS
-   
+
+;reflecting fireball
 CODE_EA37:
-   LDA $04FC                
-   BNE CODE_EA36
+   LDA $04FC			;timer for when fireball should appear
+   BNE CODE_EA36		;return
    
-   LDA $04BF                
-   BNE CODE_EA4C                
-   JSR CODE_EEAD                
-   JSR CODE_E9AC
+   LDA $04BF			;
+   BNE CODE_EA4C		;flag for if fireball has just appeared
+   JSR CODE_EEAD		;make fire ball appear?
+   JSR CODE_E9AC		;set initial values for reflecting fireball entity
    
-   LDA #$01                 
-   STA $04BF
+   LDA #$01			;set the flag
+   STA $04BF			;
   
 CODE_EA4C:
    LDA $0430                
@@ -8724,11 +8741,11 @@ CODE_EEAD:
    BCC CODE_EEBB
 
 CODE_EEB9:  
-   PLA                      
-   PLA
+   PLA				;terminate (return from routine that called this routine)
+   PLA				;
 
 CODE_EEBB:  
-   RTS
+   RTS				;
 
 CODE_EEBC:   
    JSR CODE_D328                
@@ -8829,8 +8846,8 @@ CODE_EF48:
 
 ;related with freezie and freezing tiles (sprite tiles)
 CODE_EF50:
-   LDA $04CC                
-   ASL A                    
+   LDA $04CC
+   ASL A
    ASL A                    
    ASL A                    
    ASL A                    
@@ -8871,6 +8888,7 @@ DATA_EF9D:
 .db $93,$00,$00,$94,$00,$00,$95,$00
 .db $92,$00,$93,$00,$94,$00,$FF
 
+;initial values for reflecting fireball
 DATA_EFBB:
 .db $01,$01,$03,$01,$3D,$07,$92,$02
 .db $F4,$00,$04,$00,$00,$00,$00,$B0
@@ -8958,19 +8976,19 @@ DATA_F0A5:
 .db $85,$87
 
 .db $20,$85
-.db $4A				;if bit 6 is set, it'll reset that bit and repeat a single tile multiple times (probably not entirely true)
-.db $7B				;so, bit 6 is reset, so it'll write $0A of this tile in a row
+.db VRAMWriteCommand_Repeat|$0A
+.db $7B
 
 .db $20,$90
-.db $4A
+.db VRAMWriteCommand_Repeat|$0A
 .db $7B
 
 .db $21,$85
-.db $4A
+.db VRAMWriteCommand_Repeat|$0A
 .db $89
 
 .db $21,$90
-.db $4A
+.db VRAMWriteCommand_Repeat|$0A
 .db $89
 
 .db $20,$C3
@@ -9053,18 +9071,18 @@ DATA_F0A5:
 .db $C0
 
 .db $23,$D8
-.db $48				;repeat 8 times same attribute
+.db VRAMWriteCommand_Repeat|$08		;repeat 8 times same attribute
 .db $FF
 
 .db $23,$E0
-.db $50
+.db VRAMWriteCommand_Repeat|$10
 .db $55
 
 .db $23,$F0
-.db $48
+.db VRAMWriteCommand_Repeat|$08
 .db $AA
 
-.db $00				;end writing (finally)
+.db VRAMWriteCommand_Stop		;end writing (finally)
 
 DATA_F1E7:
 .db $21,$20,$4E,$21,$32,$4E,$21,$E8
@@ -9093,7 +9111,7 @@ DATA_F203:
 .db $0F,$30,$27,$16			;>Sprite 2, used by sidesteppers and fireballs
 .db $0F,$2C,$12,$25			;>Sprite 3, used last enemy and by freezies
 
-.db $00					;Command used to stop writing.
+.db VRAMWriteCommand_Stop		;Command used to stop writing.
 
 DATA_F227:
 .db $3F,$00				;PPU Address
@@ -9107,7 +9125,7 @@ DATA_F227:
 
 .db $0F,$35,$35,$35			;>Sprite 1, used by select sprite
 
-.db $00					;stop writing
+.db VRAMWriteCommand_Stop		;stop writing
 
 ;General attribute setup table
 ;attributes that ar written for all phases. that being HUD and brick floor. just like before, uses generic PPU write format.
@@ -9123,43 +9141,44 @@ DATA_F23F:
 .db $F5,$FF,$FF,$FF,$FF,$FF,$FF,$F5
 .db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
 
-.db $00					;stop write
+.db VRAMWriteCommand_Stop		;stop write
 
 
 ;attributes used for ledge tiles 93 and 97
 DATA_F266:
 .db $23,$D0
-.db $58					;repeat one byte $18 times
+.db VRAMWriteCommand_Repeat|$18		;repeat one byte $18 times
 .db $00					;
 
 .db $23,$E8
 .db $08					;8 bytes
 .db $50,$00,$00,$00,$00,$00,$00,$50	;
 
-.db $00					;end
+.db VRAMWriteCommand_Stop		;end
 
 ;attributes used for ledge tiles 94 and 96
 DATA_F276:
 .db $23,$D0
-.db $58
+.db VRAMWriteCommand_Repeat|$18
 .db $AA
 
 .db $23,$E8
 .db $08
 .db $5A,$AA,$AA,$00,$00,$AA,$AA,$5A
-.db $00					;stop write
+
+.db VRAMWriteCommand_Stop		;stop write
 
 ;attributes used for ledge tile 95
 DATA_F286:
 .db $23,$D0
-.db $58
+.db VRAMWriteCommand_Repeat|$18
 .db $FF
 
 .db $23,$E8
 .db $08
 .db $5F,$FF,$FF,$00,$00,$FF,$FF,$5F
 
-.db $00
+.db VRAMWriteCommand_Stop
 
 ;graphic pointers for every entity in game
 DATA_F296:
@@ -9421,11 +9440,25 @@ DATA_F643:
 DATA_F64D:
 .db $F7,$F8,$FA,$FB,$FC,$FD,$FE,$FE
 .db $FE,$FE,$FE,$FF,$FF,$00,$FF,$00
-.db $00,$FF,$AA,$20,$63,$01,$2A,$20
-.db $6B,$03,$2B,$2C,$2D,$00
+.db $00,$FF,$AA
 
+;this is used for HUD (player 1 and TOP prefixes)
+DATA_F660:
+.db $20,$63
+.db $01				;1 tile
+.db $2A				;I- (first player score)
+
+.db $20,$6B
+.db $03
+.db $2B,$2C,$2D			;TOP-
+.db VRAMWriteCommand_Stop	;stop
+
+;this is also for HUD, for player 2, if applicable
 DATA_F66B:
-.db $20,$75,$02,$29,$2A,$00
+.db $20,$75
+.db $02
+.db $29,$2A			;II-
+.db VRAMWriteCommand_Stop
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;DATA_F671 - Life display OAM data
@@ -9497,140 +9530,131 @@ DATA_F735:
 ;Middle platform
 DATA_F763:
 .db $21,$EE
-.db $44
+.db VRAMWriteCommand_Repeat|$04
 .db $97
 
 .db $23,$DB
 .db $02
 .db $20,$80
-
-.db $00
+.db VRAMWriteCommand_Stop
 
 DATA_F76D:
 .db $21,$EC
-.db $42
+.db VRAMWriteCommand_Repeat|$02
 .db $97
 
 .db $21,$F2
-.db $42
+.db VRAMWriteCommand_Repeat|$02
 .db $97
 
 .db $23,$DB
 .db $02
 .db $00,$00
-
-.db $00
+.db VRAMWriteCommand_Stop
 
 DATA_F77B:
 .db $21,$EA
-.db $42
+.db VRAMWriteCommand_Repeat|$02
 .db $97
 
 .db $21,$F4
-.db $42
+.db VRAMWriteCommand_Repeat|$02
 .db $97
 
 .db $23,$DA
 .db $04
 .db $20,$00,$00,$80
-
-.db $00
+.db VRAMWriteCommand_Stop
 
 DATA_F78B:
 .db $21,$E8
-.db $42
+.db VRAMWriteCommand_Repeat|$02
 .db $97
 
 .db $21,$F6
-.db $42
+.db VRAMWriteCommand_Repeat|$02
 .db $97
 
 .db $23,$DA
 .db $04
 .db $00,$00,$00,$00
-
-.db $00
+.db VRAMWriteCommand_Stop
 
 DATA_F79B:
 .db $22,$A4
-.db $44
+.db VRAMWriteCommand_Repeat|$04
 .db $97
 
 .db $23,$E9
 .db $01
 .db $50
-
-.db $00
+.db VRAMWriteCommand_Stop
 
 DATA_F7A4:
 .db $22,$A2
-.db $42
+.db VRAMWriteCommand_Repeat|$02
 .db $97
 
 .db $22,$A8
-.db $42
+.db VRAMWriteCommand_Repeat|$02
 .db $97
 
 .db $23,$E8
 .db $03
 .db $52,$00,$08
-.db $00
+.db VRAMWriteCommand_Stop
 
 DATA_F7B3:
 .db $22,$A0
-.db $42
+.db VRAMWriteCommand_Repeat|$02
 .db $97
 
 .db $22,$AA
-.db $42
+.db VRAMWriteCommand_Repeat|$02
 .db $97
 
 .db $23,$E8
 .db $03
 .db $50,$00,$00
-
-.db $00
+.db VRAMWriteCommand_Stop
 
 DATA_F7C2:
 .db $22,$B8
-.db $44
+.db VRAMWriteCommand_Repeat|$04
 .db $97
 
 .db $23,$EE
 .db $01
 .db $50
-
-.db $00
+.db VRAMWriteCommand_Stop
 
 DATA_F7CB:
 .db $22,$B6
-.db $42
+.db VRAMWriteCommand_Repeat|$02
 .db $97
 
 .db $22,$BC
-.db $42
+.db VRAMWriteCommand_Repeat|$02
 .db $97
 
 .db $23,$ED
 .db $03
 .db $02,$00,$58
-
-.db $00
+.db VRAMWriteCommand_Stop
 
 DATA_F7DA:
 .db $22,$B4
-.db $42
+.db VRAMWriteCommand_Repeat|$02
 .db $97
 
 .db $22,$BE
-.db $42
+.db VRAMWriteCommand_Repeat|$02
 .db $97
 
 .db $23,$ED
 .db $03
 .db $00,$00,$50
-
-.db $00
+.db VRAMWriteCommand_Stop
 
 .db $00
 .db $03,$FF,$03,$00,$03,$00,$03,$FF
@@ -9644,15 +9668,35 @@ DATA_F7DA:
 DATA_F81C:
 .db $00,$01,$02,$02,$01,$00,$AA
 
+;this table contains movement for Mario for demo mode. consists of pairs that are input and time for said input to be held.
 DATA_F823:
-.db $00,$5C,$01,$50,$00,$10,$02,$14
-.db $82,$40,$00,$10,$01,$28,$00,$50
-.db $80,$40,$02,$28,$00,$14,$01,$10
-.db $81,$40,$00,$48,$01,$30,$81,$30
-.db $01,$10,$00,$10,$02,$45,$82,$40
-.db $02,$20,$00,$08,$01,$40,$81,$40
-.db $AA                  
+.db $00,$5C
+.db Input_Right,$50
+.db $00,$10
+.db Input_Left,$14
+.db Input_Left|Input_A,$40
+.db $00,$10
+.db Input_Right,$28
+.db $00,$50
+.db Input_A,$40
+.db Input_Left,$28
+.db Input_Right,$14
+.db Input_Right,$10
+.db Input_Right|Input_A,$40
+.db $00,$48
+.db Input_Right,$30
+.db Input_Right|Input_A,$30
+.db Input_Right,$10
+.db $00,$10
+.db Input_Left,$45
+.db Input_Left|Input_A,$40
+.db Input_Left,$20
+.db $00,$08
+.db Input_Right,$40
+.db Input_Right|Input_A,$40
+.db Demo_EndCommand
 
+;same as above but for Luigi.
 DATA_F854:
 .db $00,$30,$02,$50,$00,$10,$01,$18
 .db $81,$30,$81,$18,$00,$10,$02,$24
@@ -9688,15 +9732,15 @@ CODE_F8A7:
    STA $4017					;/set APU frame counter to 4-step sequence and clear frame interrupt flag
    JSR CODE_FA91				;play sound effects and music and stuff
    
-   LDA #$00					;\clear sound effect flags
-   STA $FF					;|
-   STA $FE					;|
-   STA $FD					;|
+   LDA #$00					;\clear sound effect triggers
+   STA Sound_Effect2				;|
+   STA Sound_Effect				;|
+   STA Sound_Jingle				;|
    STA $4011					;/and DMC load counter
    RTS						;
    
 CODE_F8C2:
-   LDX #$90                 
+   LDX #$90
    BNE CODE_F8CB
 
 CODE_F8C6:   
@@ -10127,7 +10171,7 @@ CODE_FB48:
    BNE CODE_FB6C
    
    LDA $F4                  
-   AND $0500                
+   AND RandomNumberStorage			;sound effect and RNG? (i think this is freezy sound?)
    LSR A                    
    LSR A                    
    CLC                      
@@ -10148,7 +10192,7 @@ CODE_FB5C:
    STA $4007
 
 CODE_FB6C:
-   LDA $0500
+   LDA RandomNumberStorage
    AND #$03                 
    LDA DATA_FB3A,Y              
    STA $4005                
@@ -10451,7 +10495,7 @@ CODE_FCF3:
    BEQ CODE_FD1A
   
 CODE_FD0B:
-   LDA $0500                
+   LDA RandomNumberStorage
    LSR A                    
    BCC CODE_FD1A
    
