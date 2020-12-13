@@ -14,6 +14,9 @@ EntityDataPointer = $14			;2 bytes, used by entities for indirect addressing
 ;Controller addresses. Format: ABetUDLR, A = A button, B = B button, e = select, t = start, U = Up, D = Down, L = Left, R = Right.
 ;Do note that InputPress only resets A and B bits after press.
 
+ControllerInputHolding = $18		;base adress for both controllers (indexed)
+ControllerInputPress = $19		;same as above but for presses
+
 Controller1InputHolding = $18		;controller input bits for player 1, holding.
 Controller1InputPress = $19		;controller input bits for player 1, press.
 
@@ -42,35 +45,34 @@ DemoFlag = $30				;flag set when demo plays
 TwoPlayerModeFlag = $39			;this flag is used to check wether player's in 2P mode for score display
 
 GameAorBFlag = $3A			;self explanatory, set if player chose game B
-GameplayModeBackup = $3B		;this is used as a temporary storage for Gameplay mode.
-
+GameplayModeNext = $3B			;game mode that goes next after execution
 
 PaletteFlag = $3F			;Wether or not game should update palette, and which palette to use. $00 - Don't update, keep current palette, $01 - Gameplay Palette, anything else - Title Screen Palette.
 
 GameplayMode = $40			;used for pointers to handle various gameplay aspects, such as (un)pausing, proceeding to next phase, coin counting after "Test Your Skill" and other.
 
-DisplayLevelNum = $41			;
+DisplayLevelNum = $41			;rename to CurrentPhase? i mean it IS used for display but also checked, so maybe it's global
 
 UpdateEntitiesFlag = $42		;0 - update, 1 - don't update. used to prevent lag? (set after normal game mode, reset after NMI) (or is it?)
 
+LastEnemyFlag = $46			;if set, we have the last enemy to defeat to proceed to the next phase
+
+;TO-DO: rename zero lives flags (amd LuigiGameOverFlag) because they're not really that (slightly different function)
+PlayerLives = $48			;base address for lives (indexed)
+PlayerZeroLivesFlag = $48		;also base address (also indexed)
+
 Player1Lives = $48
-
-MarioGameOverFlag = $49
-
-GameOverFlag = $4A			;non-player specific game over flag.
+Player1TriggerGameOverFlag = $49 	;set to 1 if dying with 0 lives, triggering game over (if set, dying/winning triggers game over)
+Player1GameOverFlag = $4A		;
 
 Player2Lives = $4C
-
-LuigiGameOverFlag = $4D
-
-Player2DisplayFlag = $4E
+Player2TriggerGameOverFlag = $4D
+Player2GameOverFlag = $4E
 
 NonGameplayMode = $50			;this is used for modes without player's gameplay (title screen, demo)
 
 Demo_InputIndex = $55
 Demo_InputTimer = $56
-
-;$53 - unused
 
 PowHitsLeft = $70
 POWPowerTimer = $71			;timer set when POW is hit, to run hit interaction with everything on-screen. 
@@ -84,14 +86,19 @@ Player1Score = $95			;3 bytes
 Player2Score = $99			;3 bytes
 Player2ScoreDisplay = $9E		;seems to be another flag for score display for player 2, except this doesn't handle "II" tile on screen.
 
+Player1_Got1UPFlag = $AD		;a flag for wether the player has gotten a 1-up by obtaining a certain amoutnt of score
+Player2_Got1UPFlag = $AE		;same but for player 2
+
 CurrentEntity_ActiveFlag = $B0		;flag for current entity wether it exists or not
-CurrentEntity_Bits = $B1		;bits used for various entities for various purposes
-CurrentEntity_ID = $B5
+CurrentEntity_Bits = $B1		;bits used for various entities for various purposes. some enemies use bits 0 and 1 for movement direction (bit 0 - move right, bit 1 - move left)
+CurrentEntity_DrawMode = $B5		;how to draw i entity?
+CurrentEntity_DrawTile = $B6		;first sprite tile it's drawing
 CurrentEntity_YPos = $B8
 CurrentEntity_XPos = $B9
 CurrentEntity_CurrentPlatform = $BE
 CurrentEntity_Timer = $C2		;some kinda of timer, i think
-CurrentEntity_XSpeed = $C4
+;CurrentEntity_XSpeed = $C4
+CurrentEntity_XSpeed = $C5
 CurrentEntity_State = $C6
 CurrentEntity_HitBoxYPos = $CE
 CurrentEntity_HitBoxXPos = $CF
@@ -111,6 +118,11 @@ BonusTimeMilliSecs = $04B2
 TESTYOURSKILL_CoinCountPointer = $04B4	;coin count state after time runs out/all coins are collected
 Player1BonusCoins = $04B5
 Player2BonusCoins = $04B6
+
+BonusCoins_TotalCollected = $04BB
+
+GameOverStringTimer = $04F0
+PhaseStringTimer = $04F1		;for how long PHASE X string will be shown on string
 
 RandomNumberStorage = $0500
 
@@ -156,7 +168,7 @@ Sound_Loop_Timer = $04
 Sound_Loop_Fireball = $08
 
 ;$FD
-Sound_Jingle_GameStart = $01		;plays when starting the game
+Sound_Jingle_GameStart = $01		;plays when starting the game from phase 1
 Sound_Jingle_PhaseStart = $02		;plays when proceeding to the next phase
 Sound_Jingle_PERFECT = $04		;plays after "Test Your Skill" if got "perfect!!"
 Sound_Jingle_Pause = $08		;plays when pausing the game (and when gaining an extra life, apparently)
@@ -188,5 +200,25 @@ Sound_Effect2_Step = $80		;when player moves around, sound changes slightly ever
 ;used by demo screen
 Demo_EndCommand = $AA
 
+;Entity addresses' values ($B5)
+CurrentEntity_Draw_16x24 = 0		;used by mario and luigi
+CurrentEntity_Draw_16x16 = 1		;used by coin effect (kinda popping effect that looks 16x16)
+CurrentEntity_Draw_8x16_AnimFlicker = 2	;this is used by by sidestepper, top tile flickers
+CurrentEntity_Draw_8x16_Flicker = 3	;used by sidesteppers and fighterflies, they change top tile position every frame.
+CurrentEntity_Draw_8x16 = 5		;8x16. used by coins, freezies and other effects
+CurrentEntity_Draw_8x16_Shift = 6	;8x16 but the top tile is slightly shifter horizontally. used by Shellcreepers
+CurrentEntity_Draw_8x8 = 7		;should be obvious, used for fireballs and various effects
+
+;States for entities
+
+Player_State_AppearAfterDeath = $02
+
+;Entity graphics (first tile for each, after which +1 is added for others)
+GFX_Player_Standing = $12		;still
+GFX_Player_Hurt = $32
+
+
 ;various OAM slots
 Cursor_OAM_Slot = 0			;
+
+;VRAM positions for various things, such as strings (to be added)
