@@ -117,15 +117,17 @@ Player2_Got1UPFlag = $AE			;same but for player 2
 
 CurrentEntity_ActiveFlag = $B0			;flag for current entity wether it exists or not
 CurrentEntity_Bits = $B1			;bits used for various entities for various purposes. some enemies use bits 0 and 1 for movement direction (bit 0 - move right, bit 1 - move left)
+CurrentEntity_Timer = $B3			;general entity timer used for various things
 CurrentEntity_AnimationPointer = $B4		;used to animate by pointing to a CurrentEntity_DrawTile in a table (when FF, it loops to the first value of the animation)
 CurrentEntity_DrawMode = $B5			;how to draw i entity?
 CurrentEntity_DrawTile = $B6			;first sprite tile it's drawing
+;B7
 CurrentEntity_YPos = $B8
 CurrentEntity_XPos = $B9
 CurrentEntity_CurrentPlatform = $BE
 CurrentEntity_ID = $BF
 ;$C1 - misc entity ram?
-CurrentEntity_Timer = $C2			;some kinda of timer, i think (maybe misc ram, not necessarily a timer)
+;CurrentEntity_Timer = $C2			;some kinda of timer, i think (maybe misc ram, not necessarily a timer)
 ;C3
 ;CurrentEntity_Misc = $C4			;used for various purposes depending on current entity. for player character, this is used as a counter for skidding when moving horizontally, increments up to 2. 0 - start slow, 1 - move but no skid when turning, 02 - skid when turning
 CurrentEntity_XSpeed = $C5
@@ -294,6 +296,14 @@ Sound_Effect2_Step = $80			;when player moves around, sound changes slightly eve
 Demo_EndCommand = $AA
 
 ;Entity addresses' values
+;those are most likely shared like moving for players and other entities are the same. we'll see...
+;$B1
+CurrentEntity_Bits_MovingRight = $01
+CurrentEntity_Bits_MovingLeft = $02
+CurrentEntity_Bits_Skidding = $04
+CurrentEntity_Bits_Fall = $40
+CurrentEntity_Bits_Jump = $80			;used by mario and fighterflies
+
 ;$B5
 CurrentEntity_Draw_16x24 = 0			;used by mario and luigi
 CurrentEntity_Draw_16x16 = 1			;used by coin effect (kinda popping effect that looks 16x16)
@@ -303,19 +313,8 @@ CurrentEntity_Draw_8x16 = 5			;8x16. used by coins, freezies and other effects
 CurrentEntity_Draw_8x16_Shift = 6		;8x16 but the top tile is slightly shifter horizontally. used by Shellcreepers
 CurrentEntity_Draw_8x8 = 7			;should be obvious, used for fireballs and various effects
 
-;$BF
-CurrentEntity_ID_Mario = $01			;i suspect luigi is #$02
-CurrentEntity_ID_Shellcreeper = $10
-CurrentEntity_ID_Sidestepper = $20
-CurrentEntity_ID_Fighterfly = $30
-CurrentEntity_ID_Coin = $40
-
-Entity_Address_Size = $0020			;how many bytes does each entity use?
-
-;States for entities
-Player_State_AppearAfterDeath = $02
-
 ;Entity graphics (first tile for each, after which +1 is added for others)
+;$B6
 GFX_Player_Walk1 = $06
 GFX_Player_Walk2 = $0C
 GFX_Player_Walk3 = $00
@@ -360,6 +359,19 @@ GFX_Fireball_Move1 = $92
 GFX_Fireball_Move2 = $93
 GFX_Fireball_Move3 = $94
 GFX_Fireball_Move4 = $95
+
+;$BF
+CurrentEntity_ID_Mario = $01			;i suspect luigi is #$02
+CurrentEntity_ID_Shellcreeper = $10
+CurrentEntity_ID_Sidestepper = $20
+CurrentEntity_ID_Fighterfly = $30
+CurrentEntity_ID_Coin = $40
+
+;States for entities
+;$C6
+Player_State_AppearAfterDeath = $02
+
+Entity_Address_Size = $0020			;how many bytes does each entity use?
 
 ;various OAM slots
 Cursor_OAM_Slot = 0				;

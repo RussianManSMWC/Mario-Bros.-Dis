@@ -1408,17 +1408,18 @@ CODE_C782:
    
 CODE_C785:
    LDA $BF                  
-   CMP #$30                 
+   CMP #CurrentEntity_ID_Fighterfly		;check if figherfly
    BNE CODE_C7B7
    
-   LDA $C0                  
-   BNE CODE_C792                
-   JSR CODE_CE9C
+   LDA $C0					;grounded flag?
+   BNE CODE_C792				;
+
+   JSR CODE_CE9C				;animate (animate while jumping and falling)
 
 CODE_C792:  
-   LDA $B3                  
-   BEQ CODE_C797                
-   RTS
+   LDA CurrentEntity_Timer			;timer for fighterfly to jump?
+   BEQ CODE_C797				;
+   RTS						;
 
 CODE_C797:   
    LDA $C0                  
@@ -1652,7 +1653,8 @@ CODE_C8B7:
 
 CODE_C8C7:  
    CMP #$26                 
-   BNE CODE_C8D1                
+   BNE CODE_C8D1
+
    LDA $FF                  
    ORA #$40
 
@@ -1685,7 +1687,7 @@ CODE_C8E4:
    BNE CODE_C916
 
 CODE_C8F1:  
-   JSR CODE_CE95
+   JSR CODE_CE95				;common movement animation routine
   
 CODE_C8F4:
    LDY #$00
@@ -2117,9 +2119,9 @@ CODE_CAF7:
    STA $33
    
    LDX #$01
-   LDA $2F
-   LSR A
-   BCC CODE_CB08
+   LDA FrameCounter				;do something every other frame...
+   LSR A					;
+   BCC CODE_CB08				;
    
    LDX #$0E
    
@@ -2138,16 +2140,15 @@ CODE_CB08:
 
 CODE_CB18:
    LDY #$00
-   LDA ($14),y
+   LDA ($14),y				;if the entity isn't even active
+   BEQ CODE_CB29			;
    
-   BEQ CODE_CB29
-   
-   LDY #$03
-   LDA ($14),y
-   BEQ CODE_CB29
-   SEC
-   SBC #$01
-   STA ($14),y
+   LDY #$03				;
+   LDA ($14),y				;decrease timer address for current entity (CurrentEntity_TimerB3)
+   BEQ CODE_CB29			;
+   SEC					;
+   SBC #$01				;
+   STA ($14),y				;
 
 CODE_CB29:
    LDA $33
@@ -2771,149 +2772,150 @@ CODE_CE00:
    BNE CODE_CDC4				;do actual writing
 
 ;Restore camera position after messing with VRAM
-CODE_CE09:   
+CODE_CE09:
    PHA
-   LDA CameraPosY			;restore camera position
-   STA VRAMRenderAreaReg		;
+   LDA CameraPosY				;restore camera position
+   STA VRAMRenderAreaReg			;
 
-   LDA CameraPosX			;
-   STA VRAMRenderAreaReg		;
-   PLA					;
-   RTS					;
+   LDA CameraPosX				;
+   STA VRAMRenderAreaReg			;
+   PLA						;
+   RTS						;
 
 CODE_CE16:
-   LDA #$00				;set up address we're copying data to      
-   STA $03				;
+   LDA #$00					;set up address we're copying data to      
+   STA $03					;
 
-   LDA #$02				;it's OAM data, starting from first slot
-   STA $04				;
+   LDA #$02					;it's OAM data, starting from first slot
+   STA $04					;
 
-   LDY $02				;load offset
-   DEY					;-1
-   LDX $02				;load amount of bytes to copy
+   LDY $02					;load offset
+   DEY						;-1
+   LDX $02					;load amount of bytes to copy
 
 ;this routine is used to copy data from one area of addresses to another (from ROM to RAM or RAM to RAM)
 ;there's only a single JSR for this.
 
 CODE_CE23:
-   LDA ($00),Y				;
-   STA ($03),Y				;
-   DEY					;
-   DEX					;
-   BNE CODE_CE23			;
-   RTS					;
+   LDA ($00),Y					;
+   STA ($03),Y					;
+   DEY						;
+   DEX						;
+   BNE CODE_CE23				;
+   RTS						;
 
 ;Set up buffered write.
 ;Used by things such as POW block and score updates.
 
 CODE_CE2C:
-   LDA #$01				;enable drawing for various tiles (in NMI via buffer)
-   STA BufferDrawFlag			;
-   
-   LDY #$00				;
-   LDA ($02),Y				;number of bytes to update on a single row
-   AND #$0F				;
-   STA $05				;
+   LDA #$01					;enable drawing for various tiles (in NMI via buffer)
+   STA BufferDrawFlag				;
 
-   LDA ($02),Y				;number of rows to update        
-   LSR A				;
-   LSR A				;
-   LSR A				;
-   LSR A				;
-   STA $04				;
-   
-   LDX BufferOffset			;get buffer offset if any
+   LDY #$00					;
+   LDA ($02),Y					;number of bytes to update on a single row
+   AND #$0F					;
+   STA $05					;
+
+   LDA ($02),Y					;number of rows to update        
+   LSR A					;
+   LSR A					;
+   LSR A					;
+   LSR A					;
+   STA $04					;
+
+   LDX BufferOffset				;get buffer offset if any
 
 CODE_CE43:   
-   LDA $01				;VRAM position, high byte
-   STA BufferAddr,X			;
-   
-   JSR CODE_CE84			;
-   
-   LDA $00				;VRAM position, low byte
-   STA BufferAddr,X			;
-   
-   JSR CODE_CE84			;
-   
-   LDA $05				;number of tiles to draw
-   STA $06				;set up a loop
-   STA BufferAddr,X 			;and save that information in the buffer.
-   
-CODE_CE5A:
-   JSR CODE_CE84			;
-   
-   INY					;get those tiles in the buffer
-   LDA ($02),Y				;
-   STA BufferAddr,X			;
+   LDA $01					;VRAM position, high byte
+   STA BufferAddr,X				;
 
-   DEC $06				;keep looping untill all bytes are in the buffer  
-   BNE CODE_CE5A			;
-   JSR CODE_CE84			;
-   
-   STX BufferOffset			;store current buffer offset
-   CLC					;
-   LDA #$20				;add + $20 to the VRAM position, so it's the next row
-   ADC $00				;
-   STA $00				;
-   
-   LDA #$00				;high byte  
-   ADC $01				;
-   STA $01				;
-   
-   DEC $04				;check number of rows
-   BNE CODE_CE43			;if not all, keep loopin'
-   
-   LDA #$00				;put an end for buffered write.  
-   STA BufferAddr,X			;
-   RTS					;
+   JSR CODE_CE84				;
+
+   LDA $00					;VRAM position, low byte
+   STA BufferAddr,X				;
+
+   JSR CODE_CE84				;
+
+   LDA $05					;number of tiles to draw
+   STA $06					;set up a loop
+   STA BufferAddr,X 				;and save that information in the buffer.
+
+CODE_CE5A:
+   JSR CODE_CE84				;
+
+   INY						;get those tiles in the buffer
+   LDA ($02),Y					;
+   STA BufferAddr,X				;
+
+   DEC $06					;keep looping untill all bytes are in the buffer  
+   BNE CODE_CE5A				;
+   JSR CODE_CE84				;
+
+   STX BufferOffset				;store current buffer offset
+   CLC						;
+   LDA #$20					;add + $20 to the VRAM position, so it's the next row
+   ADC $00					;
+   STA $00					;
+
+   LDA #$00					;high byte  
+   ADC $01					;
+   STA $01					;
+
+   DEC $04					;check number of rows
+   BNE CODE_CE43				;if not all, keep loopin'
+
+   LDA #$00					;put an end for buffered write.  
+   STA BufferAddr,X				;
+   RTS						;
 
 CODE_CE84:   
-   INX					;write next buffer byte
-   TXA					;transfer into X for the next check
+   INX						;write next buffer byte
+   TXA						;transfer into X for the next check
 
 CODE_CE86:   
-   CMP #$2F				;check if there's too much to update
-   BCC CODE_CE94			;if not, moving on
-   
-   LDX BufferOffset			;get current buffer offset
-   
-   LDA #$00				;and cut this particular update out
-   STA BufferAddr,X			;maybe for the next time
-   
-   PLA					;terminate call             
-   PLA					;
+   CMP #$2F					;check if there's too much to update
+   BCC CODE_CE94				;if not, moving on
+
+   LDX BufferOffset				;get current buffer offset
+
+   LDA #$00					;and cut this particular update out
+   STA BufferAddr,X				;maybe for the next time
+
+   PLA						;terminate call             
+   PLA						;
 
 CODE_CE94:   
-   RTS					;
+   RTS						;
 
+;used to animate some entities (specifically, their movement)
 CODE_CE95:
-   LDA $B1                  
-   AND #$C0                 
-   BEQ CODE_CE9C                
-   RTS                      
-   
-CODE_CE9C:
-   LDA $B1                  
-   AND #$03                 
-   BNE CODE_CEA3                
-   RTS                      
-  
-CODE_CEA3:
-   LDY $B4                  
-   LDA DATA_F4B2,Y              
-   CMP #$FF                 
-   BEQ CODE_CEB1
-   STA $B6
+   LDA CurrentEntity_Bits			;if an entity is either falling or jumping, don't animate
+   AND #CurrentEntity_Bits_Jump|CurrentEntity_Bits_Fall
+   BEQ CODE_CE9C				;
+   RTS						;
 
-   INC $B4                  
-   RTS                      
+CODE_CE9C:
+   LDA CurrentEntity_Bits			;is entity even moving? no?
+   AND #CurrentEntity_Bits_MovingRight|CurrentEntity_Bits_MovingLeft
+   BNE CODE_CEA3				;yes? dew yeet
+   RTS						;
+
+CODE_CEA3:
+   LDY CurrentEntity_AnimationPointer		;
+   LDA DATA_F4B2,Y				;
+   CMP #$FF					;encountered loop command?
+   BEQ CODE_CEB1				;use next byte to go to specified point
+   STA CurrentEntity_DrawTile			;otherwise just show the frame
+
+   INC CurrentEntity_AnimationPointer		;
+   RTS						;
 
 CODE_CEB1:
-   INY
-   LDA DATA_F4B2,Y				;most likely walking cycle related (for player)
-   STA $B4                  
-   JMP CODE_CEA3
-  
+   INY						;
+   LDA DATA_F4B2,Y				;reset animation cycle
+   STA CurrentEntity_AnimationPointer		;
+   JMP CODE_CEA3				;
+
 CODE_CEBA:
    LDA #GFX_Player_Standing			;player stops, display standing animation
    STA CurrentEntity_DrawTile			;
@@ -5717,8 +5719,8 @@ CODE_DCEA:
    LDA #$10					;player's state
    STA CurrentEntity_State			;got hit!
 
-   LDA #$40					;timer?
-   STA $B3					;
+   LDA #$40					;
+   STA CurrentEntity_Timer			;set the timer before dropping down
 
    LDA #GFX_Player_Hurt				;
    STA CurrentEntity_DrawTile			;
@@ -5764,7 +5766,7 @@ CODE_DD2C:
    LDA LastEnemyFlag			;was it the last enemy?
    BEQ CODE_DD3C			;if not, just kick
 
-   LDA #$00				;\disable sounds, all enemies defeated!
+   LDA #$00				;\disable all sounds, all enemies defeated!
    STA Sound_Effect			;|
    STA Sound_Jingle			;|
    STA Sound_Loop			;/
@@ -6159,106 +6161,113 @@ CODE_DF24:
 
 CODE_DF37:  
    CMP #$02                 
-   BNE CODE_DF60                
+   BNE CODE_DF60
+
    JSR CODE_CAEB
    
-   INC $B8                  
-   JSR CODE_DFB0
+   INC CurrentEntity_YPos			;move the player down with the platform
+
+   JSR GetRespawnPlatOAM_DFB0			;
    
-   INC $02C0,X              
-   INC $02C4,X
+   INC RespawnPlatform_OAM_Y,X			;
+   INC RespawnPlatform_OAM_Y+4,X		;move respawn platform down
    
-   LDA $B8                  
-   CMP #$28                 
-   BEQ CODE_DF50                
-   RTS
+   LDA CurrentEntity_YPos			;if the player is at this position, don't move down anymore
+   CMP #$28					;
+   BEQ CODE_DF50				;
+   RTS						;
    
 CODE_DF50:
-   LDA #$04                 
-   LDY $BF                  
-   DEY                      
-   BEQ CODE_DF59
+   LDA #$04					;
+   LDY CurrentEntity_ID				;state depending on which player
+   DEY						;
+   BEQ CODE_DF59				;
    
-   LDA #$08
+   LDA #$08					;
 
 CODE_DF59:   
-   STA $C6                  
+   STA CurrentEntity_State			;
    
 CODE_DF5B:
-   LDA #$FF
-   STA $B3
-   RTS
+   LDA #$FF					;
+   STA CurrentEntity_Timer			;
+   RTS						;
 
-CODE_DF60:   
-   LDA $B1                  
-   BEQ CODE_DF87                
-   BMI CODE_DF6C                
-   AND #$08                 
-   BNE CODE_DF87                
-   BEQ CODE_DF72
-   
+CODE_DF60:
+   LDA CurrentEntity_Bits			;check player's bits
+   BEQ CODE_DF87				;no bit set - keep on platform
+   BMI CODE_DF6C				;jumped off - remove the platform
+   AND #$08					;
+   BNE CODE_DF87				;some kinda but that's supposed to keep the player on the platform
+   BEQ CODE_DF72				;otherwise we've pressed a direction button, let the player go
+
 CODE_DF6C:
-   LDA #$18                 
-   STA $B6
-   BNE CODE_DF75
+   LDA #GFX_Player_Jumping			;show player's jumping frame
+   STA CurrentEntity_DrawTile			;
+   BNE CODE_DF75				;
   
 CODE_DF72:
-   JSR CODE_CEA3
+   JSR CODE_CEA3				;show a walking frame
 
 CODE_DF75:
-   LDA #$00			;remove entity?
-   STA $C6
-   STA $B3
+   LDA #$00					;
+   STA CurrentEntity_State			;let the player go
+   STA CurrentEntity_Timer			;no more platform timer
 
-   JSR CODE_DFB0
-   
-   LDA #$F4                 
-   STA $02C0,X              
-   STA $02C4,X
-  
+   JSR GetRespawnPlatOAM_DFB0			;get platform's OAM
+
+   LDA #$F4					;remove platform
+   STA RespawnPlatform_OAM_Y,X			;
+   STA RespawnPlatform_OAM_Y+4,X		;
+
 CODE_DF86:
-   RTS                      
-   
+   RTS						;
+
 CODE_DF87:
-   LDA $B3                  
-   BNE CODE_DF86                
-   JSR CODE_DFB0                
-   LDA $02C1,X              
-   CMP #$CF                 
-   BEQ CODE_DF75
+   LDA CurrentEntity_Timer			;see if the platform should decease
+   BNE CODE_DF86				;no, return
+
+   JSR GetRespawnPlatOAM_DFB0			;
+
+   LDA RespawnPlatform_OAM_Tile,X		;see of respawn platform was at it's last "health"
+   CMP #RespawnPlatform_Tile3			;aka super thin
+   BEQ CODE_DF75				;drop the player and the platform disappears
    
-   INC $02C1,X              
-   INC $02C5,X              
-   BNE CODE_DF5B     
-   
+   INC RespawnPlatform_OAM_Tile,X		;change platform's tile
+   INC RespawnPlatform_OAM_Tile+4,X		;
+   BNE CODE_DF5B				;and restore the timer
+
+;initialize respawn platform
 CODE_DF9D:
-   LDY #$07
+   LDY #$07					;OAM offset for mario
 
 CODE_DF9F:   
-   LDX #$07
+   LDX #$07					;
 
 CODE_DFA1:   
-   LDA DATA_F699,Y              
-   STA $02C0,Y              
-   DEY                      
-   DEX                      
-   BPL CODE_DFA1                
-   RTS
+   LDA DATA_F699,Y				;init values
+   STA RespawnPlatform_OAM_Y,Y			;
+   DEY						;
+   DEX						;
+   BPL CODE_DFA1				;
+   RTS						;
 
 CODE_DFAC:
-   LDY #$0F
-   BNE CODE_DF9F
+   LDY #$0F					;OAM offset for luigi
+   BNE CODE_DF9F				;
 
-CODE_DFB0:
-   LDX #$08
-   LDY $BF
-   DEY
+;get respawn platform's OAM offset
+;CODE_DFB0:
+GetRespawnPlatOAM_DFB0:
+   LDX #$08					;platform sprite tiles offset for luigi
+   LDY CurrentEntity_ID				;
+   DEY						;
    BNE CODE_DFB9
-   
-   LDX #$00
-   
+
+   LDX #$00					;platform sprite tiles offset for mario
+
 CODE_DFB9:
-   RTS
+   RTS						;
    
 CODE_DFBA:
    JSR CODE_DFBD
@@ -9815,9 +9824,12 @@ DATA_F68D:
 .db $06
 .db $00
 
+;initial values for respawn platforms
 DATA_F699:
-.db $10,$CD,$03,$6C,$10,$CD,$43,$73
-.db $10,$CD,$03,$84,$10,$CD,$43,$8B
+.db $10,RespawnPlatform_Tile1,$03,$6C			;\mario's platform
+.db $10,RespawnPlatform_Tile1,$43,$73			;/
+.db $10,RespawnPlatform_Tile1,$03,$84			;\luigi's platform
+.db $10,RespawnPlatform_Tile1,$43,$8B			;/
 
 DATA_F6A9:
 .db $FD,$FE,$FE,$FE,$FF,$FF,$00,$FF
