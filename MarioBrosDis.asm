@@ -22,7 +22,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-RESET:
+RESET_C000:
    CLD						;Disable Decimal Mode
    SEI						;set as interrupt
 
@@ -36,13 +36,13 @@ vblankloop_C002:
    DEX						;\
    TXS						;/initialize stack
 
-   LDX POWHitsLeft				;load POW-block state for RNG setup
+   LDX POWHitsLeft				;load POW-block state for RNG setup (which could be any value after a different game)
 
    LDY #$06					;set up RAM clearing loop
    STY $01					;
 
    LDY #$00					;
-   STY $00					;clear ~$600 bytes
+   STY $00					;clear $6FF bytes (because of DEY and equal zero check)
    
    LDA #$00					;reset all those bytes
    
@@ -57,6 +57,7 @@ ResetLoop:
    
    TXA						;if POW block is non-existant (hit three time)
    BNE CODE_C02B				;
+
    LDX #$5F					;start "RNG" loop at $5F
 
 CODE_C02B:
@@ -117,7 +118,7 @@ CODE_C077:
    JSR CODE_D328				;randomize numbers in a mean time
    JMP CODE_C06A				;
 
-NMI:
+NMI_C07D:
    PHA						;\usual stuff - save all registers
    TXA						;|
    PHA						;|
@@ -203,7 +204,7 @@ CODE_C0C2:
 
 CODE_C0F3:
    LDA #$00					;some flag?
-   STA $05FE					;(probably useless, but IDK)
+   STA $05FE					;
    
    LDA $0321					;button inputs by second player
    STA $10					;into $10
@@ -218,9 +219,9 @@ CODE_C0F3:
    AND #$03					;
    BEQ CODE_C15E				;if player 1 isn't moving, k
    
-   LDA $10					;check if player 2's also mving
+   LDA $10					;check if player 2's also moving
    AND #$03					;
-   BEQ CODE_C161				;
+   BEQ CODE_C161				;no, he isn't
    
    JSR CODE_C3A0				;currently unknown
    
@@ -440,24 +441,24 @@ CODE_C23C:
    BCS CODE_C236
    BCC CODE_C282
 
-;Play player squishing animation (one player jumped on another
+;Play player squishing animation (one player jumped on another)
 CODE_C24B:
-   LDA #CurrentEntity_Draw_16x16		;draw 16x16
-   STA CurrentEntity_DrawMode
-   
+   LDA #Entity_Draw_16x16			;draw 16x16
+   STA CurrentEntity_DrawMode			;
+
    LDA $BA
    JSR CODE_C3F5
-   
+
    LDA #GFX_Player_Squish1			;
    STA CurrentEntity_DrawTile			;
-   
+
    LDA $B1					;squish bit?
-   ORA #$08
-   STA $B1
-   
+   ORA #$08					;
+   STA $B1					;
+
    LDA #$2F					;timer?
    STA $BB
-   
+
    LDA $10
    AND #$43
    CMP #$40
@@ -662,43 +663,42 @@ CODE_C376:
    CMP #$01                 
    BEQ CODE_C369
 
-CODE_C37A:   
+CODE_C37A:
    JMP CODE_C3A8
-   
+
 CODE_C37D:
-   JSR CODE_C429
-   
-   LDA $B1
-   AND #$03
-   DEY
-   BEQ CODE_C399
-   CMP #$02
-   BNE CODE_C39D
-   
+   JSR CODE_C429				;check which side we're pushing from, i think
+
+   LDA $B1					;horizontal direction
+   AND #Entity_MovementBits_MovingRight|Entity_MovementBits_MovingLeft	;whew, ugly! (need to change to something shorter maybe)
+   DEY						;
+   BEQ CODE_C399				;
+   CMP #Entity_MovementBits_MovingLeft		;
+   BNE CODE_C39D				;
+
 CODE_C38B:
-   LDA #$06
-   STA $0324
-   
-   LDX #$0D
-   LDY #$10
-   LDA $B1
-   
-   JMP CODE_C402
-   
+   LDA #$06					;
+   STA Entity_Luigi_AnimationPointer		;show luigi as skidding
+
+   LDX #$0D					;movement timers
+   LDY #$10					;luigi's longer
+   LDA $B1					;
+   JMP CODE_C402				;
+
 CODE_C399:
-   CMP #$01
-   BEQ CODE_C38B
+   CMP #Entity_MovementBits_MovingRight		;
+   BEQ CODE_C38B				;
 
 CODE_C39D:
-   JMP CODE_C3A8
-   
+   JMP CODE_C3A8				;
+
 CODE_C3A0:
    LDA $05FF					;check some interaction flag
    BEQ CODE_C3A8				;
    PLA						;stop any further interaction
    PLA						;
    RTS						;
-   
+
 CODE_C3A8:
    LDY #$00					;i think this is speed related
    STY $C1					;dunno what dis is
@@ -767,37 +767,40 @@ CODE_C3F5:
    STA $0200,y
    STA $0204,y
    RTS
- 
+
+;input:
+;X - Mario's movement timer
+;Y - Luigi's movement timer
+;A - Entity Bits (player movements)
 CODE_C402:
-   AND #$03
-   ORA #$04
-   STA $B1
-   STA $0321
-   
-   STX $C2
-   
-   STY $0332
-   
-   LDY #$00
-   STY $C4
-   STY $0334
-   STY $05FE
-   INY
-   STY $05FD
-   RTS
-   
-;get horizonal difference between mario and luigi or luigi and mario (it matters)
+   AND #Entity_MovementBits_MovingRight|Entity_MovementBits_MovingLeft
+   ORA #Entity_MovementBits_Skidding		;
+   STA $B1					;so the players can't change move themselves for a little bit
+   STA $0321					;both Mario and Luigi
+
+   STX $C2					;pushing timers
+   STY $0332					;
+
+   LDY #$00					;
+   STY $C4					;no skidding turning
+   STY $0334					;
+   STY $05FE					;unknown flag that seems to be unused...
+   INY						;
+   STY $05FD					;no more interaction, a'ight?
+   RTS						;
+
+;get horizonal difference between mario and luigi or luigi and mario in that order
 CODE_C41F:
-   LDA $0329					;horizontal difference (difference between luigi and mario
+   LDA Entity_Luigi_XPos			;horizontal difference (difference between luigi and mario
    STA $1F					;
    
-   LDA $B9					;
+   LDA CurrentEntity_XPos			;
    JMP CODE_C430				;
-   
+
 CODE_C429:
-   LDA $B9					;get horizontal difference (mario vs. luigi)
+   LDA CurrentEntity_XPos			;get horizontal difference (mario vs. luigi)
    STA $1F					;
-   LDA $0329					;
+   LDA Entity_Luigi_XPos			;
    
 CODE_C430:
    SEC						;
@@ -1408,7 +1411,7 @@ CODE_C782:
    
 CODE_C785:
    LDA $BF                  
-   CMP #CurrentEntity_ID_Fighterfly		;check if figherfly
+   CMP #Entity_ID_Fighterfly			;check if figherfly
    BNE CODE_C7B7
    
    LDA $C0					;grounded flag?
@@ -2278,21 +2281,21 @@ CODE_CBC3:
 
 ;seems to be a general sprite GFX drawing routine
 CODE_CBC4:
-   LDA $B0					;if current entity is non-existent
+   LDA CurrentEntity_ActiveFlag			;if current entity is non-existent
    BEQ CODE_CBC3				;don't draw
-   
+
    LDA #>DATA_F296				;load pointer table for graphics for current entity
    STA $15
-   
+
    LDA #<DATA_F296
    STA $14
 
-   LDA $B5					;entity ID
-   JSR CODE_CC29				;get pointers
-   
-   LDA $B6					;first sprite tile to draw from (as in first tile is 12, then 13, then 14, etc.)
+   LDA CurrentEntity_DrawMode			;get
+   JSR CODE_CC29				;
+
+   LDA CurrentEntity_DrawTile			;first sprite tile to draw from (as in first tile is 12, then 13, then 14, etc.)
    STA $11					;
-   
+
    LDY #$00					;
    LDX $BA					;OAM offset
 
@@ -2302,35 +2305,35 @@ CODE_CBDD:
    BPL CODE_CBE4				;if bit 7 is set, it'll animate slower (or faster, idk)
    ASL A
 
-CODE_CBE4:  
-   EOR $2F					;
+CODE_CBE4:
+   EOR FrameCounter				;
    LSR A					;
    BCS CODE_CC1D				;load different tiles
 
-CODE_CBE9:  
-   INY
+CODE_CBE9:
+   INY						;
    LDA ($12),Y					;Y-position offset
-   
+
    INY						;
    CLC						;
-   ADC $B8					;add to current entity's Y-position
+   ADC CurrentEntity_YPos			;add to current entity's Y-position
    ADC #$FF					;
-   STA $0200,X					;sprite's Y-pos
-   
+   STA OAM_Y,X					;sprite's Y-pos
+
    INX
    LDA $11					;sprite tile
-   STA $0200,X					;
-   
+   STA OAM_Y,X					;
+
    INC $11					;next tile value
-   
+
    INX						;current entity's GFX properties
-   LDA $B7					;
-   STA $0200,X
-   
+   LDA CurrentEntity_TileProps			;
+   STA OAM_Y,X					;
+
    INX						;
    LDA ($12),Y					;load X-position offset
-   
-   BIT $B7					;if flipped horizontally, invert offset
+
+   BIT CurrentEntity_TileProps			;if flipped horizontally, invert offset
    BVS CODE_CC0D				;
    CLC						;
    BCC CODE_CC13				;
@@ -2340,11 +2343,11 @@ CODE_CC0D:
    SEC						;
    SBC #$08					;
    SEC						;
-   
+
 CODE_CC13:  
-   ADC $B9					;current entity's X-position
+   ADC CurrentEntity_XPos			;current entity's X-position
    INY						;
-   STA $0200,X					;
+   STA OAM_Y,X					;
    INX						;
    JMP CODE_CC22				;check end command
 
@@ -2358,26 +2361,26 @@ CODE_CC22:
    LDA ($12),Y					;if hit end command (AA), end drawing
    CMP #$AA					;
    BNE CODE_CBDD				;otherwise loop
-   RTS                      
-   
+   RTS						;
+
 CODE_CC29:
    ASL A					;get correct pointer, multiply by 2
-   STA $12
-   
+   STA $12					;
+
    LDA #$00					;reset A and Y (not sure why ROL is here)
-   TAY
-   ROL A
-   STA $13
-   
+   TAY						;
+   ROL A					;
+   STA $13					;
+
    JSR CODE_CDB4				;add to offset
-   
+
    LDA ($14),Y					;get graphic data pointer
    STA $12					;
    INY						;
    LDA ($14),Y					;
    STA $13					;
    RTS						;
-   
+
 CODE_CC3F:
    LDA $B8                  
    SEC                      
@@ -2421,10 +2424,10 @@ CODE_CC73:
    ADC #$08					;
    CMP #$E4					;check if current entity is low enough
    BCC CODE_CC84				;if not, well
-   
+
    LDA #$00					;IDK what this is supposed to be. i think this is supposed to hide entity that's attempting to spawn in (if the same pipe is used by  different entity) but again IDK
    STA $01
-   
+
    LDA #$20                 
    BNE CODE_CC8F
   
@@ -2890,13 +2893,13 @@ CODE_CE94:
 ;used to animate some entities (specifically, their movement)
 CODE_CE95:
    LDA CurrentEntity_Bits			;if an entity is either falling or jumping, don't animate
-   AND #CurrentEntity_Bits_Jump|CurrentEntity_Bits_Fall
+   AND #Entity_MovementBits_Jump|Entity_MovementBits_Fall
    BEQ CODE_CE9C				;
    RTS						;
 
 CODE_CE9C:
    LDA CurrentEntity_Bits			;is entity even moving? no?
-   AND #CurrentEntity_Bits_MovingRight|CurrentEntity_Bits_MovingLeft
+   AND #Entity_MovementBits_MovingRight|Entity_MovementBits_MovingLeft		;wew!
    BNE CODE_CEA3				;yes? dew yeet
    RTS						;
 
@@ -3058,140 +3061,143 @@ CODE_CF5B:
    
    INC $43                  
    RTS
-   
+
+;player's head hits the platform
 CODE_CF67:
-   LDA $71                  
-   BNE CODE_CF88
-   
-   LDA $C1                  
-   BNE CODE_CF88
-   
-   LDA $05FF                
-   BNE CODE_CF88
-   
-   LDA $04C5                
-   BNE CODE_CF88
+   LDA POWPowerTimer				;can't hit platforms if POW is active
+   BNE CODE_CF88				;
 
-;check for player entity?
-   LDX $BF                  
-   LDY #$01                 
-   CPX #$01                 
-   BEQ CODE_CF83
-   
-   LDY #$06
-   
+   LDA $C1					;player's something...
+   BNE CODE_CF88				;
+
+   LDA $05FF					;flag...
+   BNE CODE_CF88				;
+
+   LDA FreezePlatformFlag			;there's a platform freezing somewhere?
+   BNE CODE_CF88				;can't bump
+
+   LDX CurrentEntity_ID				;
+   LDY #$01					;set up ram offset for specific player
+   CPX #$01					;
+   BEQ CODE_CF83				;
+
+   LDY #$06					;
+
 CODE_CF83:
-   LDA $74,Y              
-   BEQ CODE_CF89
-  
-CODE_CF88:
-   RTS                      
+   LDA BumpBlockVars,Y				;
+   BEQ CODE_CF89				;
 
+CODE_CF88:
+   RTS						;
+
+;check which tile the player have bumped
 CODE_CF89:
-   LDX #$00
-   
+   LDX #$00					;
+
+;first, check hardcoded edges/ends (w/e you wanna call them) of platforms
 CODE_CF8B:
-   LDA $C9                  
-   CMP DATA_F574,X              
-   BNE CODE_CFA7
-   
-   LDA $CA
-   INX 
-   CMP DATA_F574,X              
-   BNE CODE_CFA8                
-   CPX #$08                 
-   BCC CODE_CFC4
+   LDA $C9					;
+   CMP DATA_F574,X				;check VRAM location of the player
+   BNE CODE_CFA7				;doesn't match
+
+   LDA $CA					;high byte
+   INX						;
+   CMP DATA_F574,X				;
+   BNE CODE_CFA8				;
+   CPX #$08					;if less than 08
+   BCC CODE_CFC4				;means right end of the platform
 
 CODE_CF9E:
-   LDX #$02                 
-   LDA #$E0                 
-   STA $12                  
-   JMP CODE_CFCA
-  
+   LDX #$02					;left end of the platform
+   LDA #$E0					;
+   STA $12					;(PlayersVRAMPos+FFE0, which means slightly higher than the platform that's being hit)
+   JMP CODE_CFCA				;
+
 CODE_CFA7:
-   INX
-  
+   INX						;
+
 CODE_CFA8:
-   INX                      
-   CPX #$10                 
-   BCC CODE_CF8B
-  
-   LDA $CB                  
-   CMP #$FA                 
-   BCC CODE_CFB6                
-   JMP CODE_D2DF
-   
+   INX						;
+   CPX #$10					;checked all edges?
+   BCC CODE_CF8B				;no, loop
+
+   LDA $CB					;something something...
+   CMP #$FA					;
+   BCC CODE_CFB6				;
+   JMP CODE_D2DF				;Hit POW block.
+
+;check screen ends
 CODE_CFB6:
-   LDA $C9                  
-   AND #$1F                 
-   BEQ CODE_CF9E                
-   CMP #$1F                 
-   BEQ CODE_CFC4
-   
-   LDX #$03                 
-   BNE CODE_CFC6
-  
+   LDA $C9					;
+   AND #$1F					;
+   BEQ CODE_CF9E				;no bits set meaning VRAM low byte is 0, meaning the left side of the screen, show as 2x2 right platform end bump animation
+   CMP #$1F					;
+   BEQ CODE_CFC4				;exactly 1F? right side of the screen = 2x2 left platform end bump anim
+
+   LDX #$03					;somewhere in the middle (3z2 animation)
+   BNE CODE_CFC6				;
+
 CODE_CFC4:
-   LDX #$01
+   LDX #$01					;
 
 CODE_CFC6:  
-   LDA #$DF                 
-   STA $12
-  
+   LDA #$DF					;(PlayersVRAMPos+FFDF, which means higher but also one tile to the left)
+   STA $12					;
+
 CODE_CFCA:
-   LDA $CB                  
-   CMP #$A0                 
-   BCS CODE_CF88
-   
-   LDA #$FF                 
-   STA $13
-   
-   LDA $CA                  
-   STA $15
-   
-   LDA $C9                  
-   STA $14
-   
-   LDA #$01                 
-   STA $83,Y
-   
-   LDA $BE                  
-   CLC                      
-   ADC #$01                 
-   STA $84,Y
-   
-   LDA $B9                  
-   STA $85,Y              
-   JSR CODE_CDB4
-   
-   LDA $CB                  
-   SEC                      
-   SBC #$93                 
-   STX $00
-   
-   ASL A                    
-   ASL A                    
-   ASL A                    
-   ASL A                    
-   ORA $00                  
-   STA $74,Y
-   
-   DEY                      
-   LDA #$00                 
-   STA $0074,Y
-   
+   LDA $CB					;probably supposed to tell the player that they can't hit the same area twice (probably in 2P mode)
+   CMP #$A0					;
+   BCS CODE_CF88				;return
+
+   LDA #$FF					;
+   STA $13					;basically adding such a big value will result in substraction instead due to overflow (can be either FFE0 or FFDF)
+
+   LDA $CA					;store player's "VRAM" position
+   STA $15					;
+
+   LDA $C9					;
+   STA $14					;
+
+   LDA #$01					;actually $84 or $89 because of offset
+   STA BumpEntityVars-1,Y			;bumped platform flag, but not for animation, but rather for hitting entities above
+
+   LDA CurrentEntity_CurrentPlatform		;get player's platform they were standing on
+   CLC						;
+   ADC #$01					;and add +1 to get the platform above
+   STA BumpEntityVars,Y				;
+
+   LDA CurrentEntity_XPos			;and where the the bump has occured
+   STA BumpEntityVars+1,Y			;
+
+   JSR CODE_CDB4				;calculate VRAM location of the top-left bump effect tile
+
+   LDA $CB					;use galaxy brain to calculate bump animation with platform tiles in mind
+   SEC						;
+   SBC #VRAMTile_PlatformBase			;
+   STX $00					;
+   ASL A					;
+   ASL A					;
+   ASL A					;
+   ASL A					;
+   ORA $00					;
+   STA BumpBlockVars,Y				;
+
+   DEY						;
+   LDA #$00					;
+   STA BumpBlockVars,Y				;$74 or $79 set to 0 (which is never checked btw)
+
+   INY						;
+   INY						;
+   STA BumpBlockVars,Y				;set animation counter to 0
+
    INY                      
-   INY                      
-   STA $0074,Y
-   
-   INY                      
-   LDA $14                  
-   STA $0074,Y
-   
-   INY                      
-   LDA $15                  
-   STA $0074,Y              
-   RTS                      
+   LDA $14					;store VRAM pos (calculated top-right)
+   STA BumpBlockVars,Y				;
+
+   INY						;btw all of the INY shenanigans probably could've been avoided by just using BumpBlockVars+1, BumpBlockVars+2 etc.
+   LDA $15					;like how they did with BumpEntityVars earlier
+   STA BumpBlockVars,Y				;
+   RTS						;
    
 CODE_D019:
    LDA $B8                  
@@ -3583,218 +3589,219 @@ CODE_D1FA:
 CODE_D1FF:
    CLC                      
    BCC CODE_D1D4                
-   
+
 CODE_D202:
-   LDA $71                  
-   BNE CODE_D217
+   LDA POWPowerTimer				;POW active?
+   BNE CODE_D217				;return
 
-   LDA $2F                  
-   LSR A                   
-   LDY #$00                 
-   BCC CODE_D20F                
-   LDY #$05
+   LDA FrameCounter				;check one player's bump tiles depending on... frame counter?
+   LSR A					;so it's Mario for one frame and luigi for another
+   LDY #$00					;
+   BCC CODE_D20F				;
+   LDY #$05					;
 
-CODE_D20F:   
-   STY $05                  
-   INY                      
-   LDA $0074,Y
-   BNE CODE_D218
-   
+CODE_D20F:
+   STY $05					;
+   INY						;
+   LDA BumpBlockVars,Y				;did we even bump a platform?
+   BNE CODE_D218				;yes, buffer things
+
 CODE_D217:
-   RTS                      
+   RTS						;
 
 CODE_D218:
-   STA $10                  
-   AND #$F0                 
-   STA $00
-   LSR A
-   LSR A
-   LSR A
-   CLC                      
-   ADC $00                  
-   ADC #$A0                 
-   STA $01
+   STA $10                  			;
+   AND #$F0					;
+   STA $00					;\calculate bump tiles first animation frame
+   LSR A					;|
+   LSR A					;|
+   LSR A					;|
+   CLC						;|
+   ADC $00					;|
+   ADC #$A0					;|general offset for bump tiles
+   STA $01					;/
 
-   INY                      
-   LDA $74,Y
+   INY						;
+   LDA BumpBlockVars,Y				;
+   TAX						;
+   CLC						;
+   ADC #$01					;
+   STA BumpBlockVars,Y				;next animation frame
    
-   TAX                      
-   CLC
-   ADC #$01                 
-   STA $74,Y 
-   
-   LDA DATA_F81C,X
-   CMP #$AA                 
-   BEQ CODE_D297
-   
-   ASL A                    
-   STA $00
-   
-   ASL A
-   CLC                      
-   ADC $00
-   ADC $01
-   STA $11
+   LDA DATA_F81C,X				;bump animation frames
+   CMP #$AA					;AA means restore tiles
+   BEQ CODE_D297				;
+   ASL A					;
+   STA $00					;
+   ASL A					;
+   CLC						;
+   ADC $00					;offset from first anim frame if necessary
+   ADC $01					;
+   STA $11					;
 
-   LDA $10                  
-   AND #$0F                 
-   CMP #$01
-   BNE CODE_D251
-   
-   LDA #$D8                 
-   BNE CODE_D257
-   
+   LDA $10					;check for for what part of the platform we've bumped
+   AND #$0F					;either somewhere in the middle, right edge or left edge
+   CMP #$01					;
+   BNE CODE_D251				;
+
+;below are some binary values.
+;bit values that are used to skip tiles. if bit is not set, skip. values above mean: %11011000 - top left and bottom left are skipped (right platform's end), %11111100 - show full 3x2 animation, %01101100 - top right and bottom right are skipped.
+   LDA #%11011000				;value used by right end of the platform
+   BNE CODE_D257				;
+
 CODE_D251:
-   CMP #$02
-   BNE CODE_D25B
-   
-   LDA #$6C
-   
+   CMP #$02					;
+   BNE CODE_D25B				;
+
+   LDA #%01101100				;left end of the platform
+
 CODE_D257:
-   LDX #$22
-   BNE CODE_D25F
+   LDX #$22					;draw 2x2
+   BNE CODE_D25F				;
 
 CODE_D25B:
-   LDA #$FC                 
-   LDX #$23
-   
+   LDA #%11111100				;all pieces
+   LDX #$23					;draw 3x2
+
 CODE_D25F:   
-   STX $0540
-   STA $10
-   
-   LDA #$00                 
-   STA $07
-   
-   LDX #$00
-   
+   STX BufferOffset2				;
+   STA $10					;
+
+   LDA #$00					;
+   STA $07					;initialize tile counter
+
+   LDX #$00					;Nintendo avoiding TAXes?
+
 CODE_D26A:
-   ASL $10
-   BCC CODE_D277
-   
-   LDA $07                  
-   CLC                      
-   ADC $11                  
-   STA $0541,X
-   
-   INX
-   
+   ASL $10					;use some bit trickery to skip some tiles if necessary (in case of edges which only display 4 out of 6 tiles)
+   BCC CODE_D277				;
+
+   LDA $07					;
+   CLC						;
+   ADC $11					;
+   STA BufferAddr2,X				;calculate tile of animation
+
+   INX						;
+
 CODE_D277:
-   INC $07
-   
-   LDA $07                  
-   CMP #$06                 
-   BNE CODE_D26A
+   INC $07					;
+
+   LDA $07					;all 6 tiles? (some may be skipped)
+   CMP #$06					;
+   BNE CODE_D26A				;nah, loop some more
 
 CODE_D27F:
-   INY                      
-   LDA $74,Y        
-   STA $00
-   
-   INY                      
-   LDA $74,Y              
-   STA $01
-   
-   LDA #<BufferAddr2			;$40   
-   STA $02
-   
-   LDA #>BufferAddr2			;$05                 
-   STA $03
-   
-   JSR CODE_CE2C                
-   RTS                      
+   INY						;
+   LDA BumpBlockVars,Y				;and of course VRAM address of affected area
+   STA $00					;
 
+   INY						;
+   LDA BumpBlockVars,Y				;
+   STA $01					;
+
+   LDA #<BufferOffset2				;$40
+   STA $02					;
+
+   LDA #>BufferOffset2				;$05
+   STA $03					;
+
+   JSR CODE_CE2C				;stuff into an actual buffer
+   RTS						;
+
+;restore platform tiles after the bump animation has ended
 CODE_D297:
-   LDA #$00                 
-   STA $84,Y
-   
-   LDA $10                  
-   LSR A                    
-   LSR A                    
-   LSR A                    
-   LSR A                    
-   CLC                      
-   ADC #$93                 
-   TAX
-   
-   LDA #$24                 
-   STA $0541                
-   STA $0542                
-   STA $0543
-   
-   LDA $10                  
-   AND #$0F                 
-   CMP #$03                 
-   BNE CODE_D2C7 
-   
-   TXA                      
-   STA $0544                
-   STA $0545                
-   STA $0546                
-   LDA #$23                 
-   BNE CODE_D2D0
-  
+   LDA #$00					;
+   STA BumpEntityVars,Y				;can't hit entities anymore since the animation is done
+
+   LDA $10					;restore platform tile
+   LSR A					;
+   LSR A					;
+   LSR A					;
+   LSR A					;
+   CLC						;
+   ADC #VRAMTile_PlatformBase			;
+   TAX						;
+
+   LDA #VRAMTile_Empty				;empty tiles
+   STA BufferAddr2				;
+   STA BufferAddr2+1				;
+   STA BufferAddr2+2				;
+
+   LDA $10					;check the animation size
+   AND #$0F					;
+   CMP #$03					;
+   BNE CODE_D2C7				;showing 2x2? yeah
+
+   TXA						;platform tiles
+   STA BufferAddr2+3				;
+   STA BufferAddr2+4				;
+   STA BufferAddr2+5				;
+
+   LDA #$23					;3x2
+   BNE CODE_D2D0				;
+
 CODE_D2C7:
-   TXA                      
-   STA $0543                
-   STA $0544
-   
-   LDA #$22
-   
-CODE_D2D0:   
-   STA $0540
-   
-   LDY $05                  
-   INY                      
-   LDA #$00                 
-   STA $74,Y
-   
-   INY                      
-   JMP CODE_D27F
+   TXA						;store platform tiles
+   STA BufferAddr2+2				;only upload 4 tiles instead of 2
+   STA BufferAddr2+3				;
+
+   LDA #$22					;2x2
+
+CODE_D2D0:
+   STA BufferOffset2				;
+
+   LDY $05					;
+   INY						;
+   LDA #$00					;but yeah, no more bump.
+   STA BumpBlockVars,Y				;
+
+   INY						;
+   JMP CODE_D27F				;
 
 ;hit POW!
 CODE_D2DF:
-   LDA POWHitsLeft			;if POW can still be hit
-   BNE CODE_D2E4			;run interaction
-   RTS					;
+   LDA POWHitsLeft				;if POW can still be hit
+   BNE CODE_D2E4				;run interaction
+   RTS						;
 
 CODE_D2E4:
-   LDA POWPowerTimer			;if POW isn't in effect
-   BEQ CODE_D2E9			;hit everything
-   RTS					;
+   LDA POWPowerTimer				;if POW isn't in effect
+   BEQ CODE_D2E9				;hit everything
+   RTS						;
 
 CODE_D2E9:
-   LDA #$0F				;set POW effect timer 
-   STA POWPowerTimer			;
+   LDA #$0F					;set POW effect timer 
+   STA POWPowerTimer				;
 
-   LDA CurrentEntity_ID			;who bumped the block, Mario or Luigi?
-   STA POWWhoHit			;
+   LDA CurrentEntity_ID				;who bumped the block, Mario or Luigi?
+   STA POWWhoHit				;
 
-   LDA #$00				;reset shake time (so the camera shifts every other frame to create
-   STA ShakeTimer			;
+   LDA #$00					;reset shake time (so the camera shifts every other frame to create
+   STA ShakeTimer				;
 
-   DEC POWHitsLeft			;POW's "hitpoints" -1
+   DEC POWHitsLeft				;POW's "hitpoints" -1
    JSR CODE_D593
 
-   LDA Sound_Effect2			;sound effect
-   ORA #Sound_Effect2_POWBump		;
-   STA Sound_Effect2			;
-   RTS					;
+   LDA Sound_Effect2				;sound effect
+   ORA #Sound_Effect2_POWBump			;
+   STA Sound_Effect2				;
+   RTS						;
 
 CODE_D301:
-   LDA POWPowerTimer			;if POW's in effect
-   BNE CODE_D306			;decrease timers
-   RTS					;
+   LDA POWPowerTimer				;if POW's in effect
+   BNE CODE_D306				;decrease timers
+   RTS						;
    
 CODE_D306:
-   LDA ShakeTimer			;
-   BEQ CODE_D30B			;
-   RTS					;
+   LDA ShakeTimer				;
+   BEQ CODE_D30B				;
+   RTS						;
    
 CODE_D30B:
-   LDA #$01				;
-   STA ShakeTimer			;
+   LDA #$01					;
+   STA ShakeTimer				;
    
-   DEC POWPowerTimer			;decrease POW's effect timer
+   DEC POWPowerTimer				;decrease POW's effect timer
    
    LDY #$01
    
@@ -4200,60 +4207,60 @@ CODE_D518:
 
 CODE_D51C:
    LDA DATA_F1E7,Y				;
-   STA BufferAddr2,X				;into buffer 2
+   STA BufferOffset2,X				;into buffer 2
    INY						;
    INX						;
    DEC $02					;
    BNE CODE_D51C				;
-   
+
    LDA $1C					;see if we drew all ledges
    BEQ CODE_D53A				;if not, continue
-   
+
    LDA #VRAMTile_Bricks				;draw bricks now
-   STA BufferAddr2,X				;
+   STA BufferOffset2,X				;
    INX						;
-   
+
    LDA $1C					;if we drew 2 rows of bricks, can put a stop now
    CMP #$02					;
    BEQ CODE_D54F				;
    BNE CODE_D54A				;
-  
+
 CODE_D53A:
    LDA DATA_F1E7,Y				;used to check for stop command
    STA $00					;
-   
+
    LDA $07					;ledge tile
-   STA BufferAddr2,X				;
+   STA BufferOffset2,X				;
    INX						;
-   
+
    LDA $00					;check if we've hit a stop command
    BNE CODE_D518				;no, continue drawing ledges
    INY						;
-   
+
 CODE_D54A:
    INC $1C					;can draw bricks now!
    JMP CODE_D518				;
-  
+
 CODE_D54F:
    LDA #VRAMWriteCommand_Stop			;can stop
-   STA BufferAddr2,X				;
+   STA BufferOffset2,X				;
    
-   LDX #<BufferAddr2				;
-   LDY #>BufferAddr2				;
+   LDX #<BufferOffset2				;
+   LDY #>BufferOffset2				;
    JSR CODE_D5D5				;store into main buffer
    JSR CODE_D58C				;draw pipes
    JSR CODE_D593				;draw POW block
    JSR CODE_D5BE				;HUD init
-   
-   LDA #$00                 
-   LDX #$09
-   
+
+   LDA #$00					;reset platform bump variables
+   LDX #$09					;
+
 CODE_D568:
-   STA $74,X                
-   DEX                      
-   BPL CODE_D568                
-   RTS                      
-   
+   STA BumpBlockVars,X				;
+   DEX						;
+   BPL CODE_D568				;
+   RTS						;
+
 CODE_D56E:
    LDA $35
    CMP #$AA
@@ -4445,23 +4452,23 @@ CODE_D634:
 
 CODE_D63C:
    LDA DATA_F722,Y				;
-   STA BufferAddr2,Y				;into a buffer that'll store to another buffer, if that makes sense
+   STA BufferOffset2,Y				;into a buffer that'll store to another buffer
    DEY						;
    BPL CODE_D63C				;
 
    LDA $00					;store low digit for both PHASE and P= strings
-   STA BufferAddr2+9				;
-   STA BufferAddr2+$10				;
+   STA BufferAddr2+8				;
+   STA BufferAddr2+$0F				;
 
    LDA $01					;and high digit (or empty tile)
-   STA BufferAddr2+$0A				;
-   STA BufferAddr2+$11				;
+   STA BufferAddr2+9				;
+   STA BufferAddr2+$10				;
 
    LDA #$FF					;how long the "PHASE XX" string stays onscreen
    STA PhaseStringTimer				;
 
-   LDX #<BufferAddr2				;toss into a buffer
-   LDY #>BufferAddr2				;
+   LDX #<BufferOffset2				;toss into a buffer
+   LDY #>BufferOffset2				;
    JSR CODE_D5D5				;
 
    LDA TESTYOURSKILL_Flag			;test your skill flag
@@ -4534,35 +4541,35 @@ CODE_D69A:
    STA PipeDelayTimer				;
    RTS						;
 
-;handles entities, by checking ID
+;sets up graphical pointers and checks some stuff...
 CODE_D6BA:
    LDA CurrentEntity_ID				;low nibble is only used by player entities
    AND #$0F					;
    BNE CODE_D710				;
+
+   LDA CurrentEntity_ID				;
+   LDX #<DATA_F584				;
+   LDY #>DATA_F584				;
+   CMP #Entity_ID_Shellcreeper			;
+   BEQ CODE_D6E6				;
+
+   LDX #<DATA_F58C				;
+   LDY #>DATA_F58C				;
+   CMP #Entity_ID_Sidestepper			;
+   BEQ CODE_D6E6				;
    
-   LDA $BF                  
-   LDX #<DATA_F584			;$84                 
-   LDY #>DATA_F584			;$F5                 
-   CMP #$10
+   LDX #<DATA_F596				;$96                 
+   LDY #>DATA_F596				;$F5                 
+   CMP #Entity_ID_Fighterfly
    BEQ CODE_D6E6
    
-   LDX #<DATA_F58C			;$8C                 
-   LDY #>DATA_F58C			;$F5                 
-   CMP #$20                 
+   LDX #<DATA_F59E				;$9E                 
+   LDY #>DATA_F59E				;$F5                 
+   CMP #Entity_ID_Freezie
    BEQ CODE_D6E6
    
-   LDX #<DATA_F596			;$96                 
-   LDY #>DATA_F596			;$F5                 
-   CMP #$30                 
-   BEQ CODE_D6E6
-   
-   LDX #<DATA_F59E			;$9E                 
-   LDY #>DATA_F59E			;$F5                 
-   CMP #$80                 
-   BEQ CODE_D6E6
-   
-   LDX #<DATA_F5A4			;$A4                 
-   LDY #>DATA_F5A4			;$F5
+   LDX #<DATA_F5A4				;$A4                 
+   LDY #>DATA_F5A4				;$F5
   
 CODE_D6E6:
    STX $06                  
@@ -4626,24 +4633,25 @@ CODE_D710:
    JMP CODE_C884
   
 CODE_D73C:
-   JSR CODE_D90D                
-   CMP #$02                 
-   BEQ CODE_D744                
-   RTS
+   JSR CODE_D90D				;check if the entity is bumped from below
+   CMP #$02					;
+   BEQ CODE_D744				;yes
+   RTS						;
    
 CODE_D744:
-   LDA $BF
-   CMP #$20                 
-   BNE CODE_D767
+   LDA CurrentEntity_ID				;is current entity...
+   CMP #Entity_ID_Sidestepper			;a side stepper?
+   BNE CODE_D767				;if not, check if it's a different entity
    
-   LDA $B4                  
-   CMP #$1A                 
-   BCC CODE_D753                
-   JMP CODE_D877
-  
+   LDA CurrentEntity_AnimationPointer		;check if side stepper is mad
+   CMP #GFX_AnimationCycle_SidestepperAngry	;
+   BCC CODE_D753				;no, make it mad
+   JMP CODE_D877				;yes, flip it
+
 CODE_D753:
-   LDA #$1A                 
-   STA $B4                  
+   LDA #GFX_AnimationCycle_SidestepperAngry	;sidestepper now appears angery
+   STA CurrentEntity_AnimationPointer		;
+
    INC $C4                  
    JSR CODE_CAB9
    
@@ -4653,12 +4661,13 @@ CODE_D753:
    
    LDA #$04                 
    BNE CODE_D797
-  
+
+;check other entities
 CODE_D767:
-   CMP #$40                 
-   BEQ CODE_D77F                
-   CMP #$80                 
-   BNE CODE_D792
+   CMP #Entity_ID_Coin				;is it a coin then?
+   BEQ CODE_D77F				;collect it
+   CMP #Entity_ID_Freezie			;freezie?
+   BNE CODE_D792				;no? that leaves shellcreeper and sidestepper
 
 ;freezie is destroyed!
    LDA Sound_Effect				;
@@ -4688,12 +4697,14 @@ CODE_D789:
    BNE CODE_D797
 
 CODE_D792:  
-   JSR CODE_EE82                
+   JSR CODE_EE82
+
    LDA #$01
 
 CODE_D797:   
    ORA $00
-   STA $C0                  
+   STA $C0
+
    LDY #$04                 
    
 CODE_D79D:
@@ -4735,12 +4746,15 @@ CODE_D7C2:
    RTS
    
 CODE_D7CE:
-   JSR CODE_C9CB                
+   JSR CODE_C9CB
+
    LDA #$03                 
-   STA $C0                  
+   STA $C0
+
    LDA $B1                  
    AND #$BF                 
-   STA $B1                  
+   STA $B1
+
    LDY #$02                 
    JMP CODE_D7AA
 
@@ -4804,7 +4818,8 @@ CODE_D831:
    
    LDA #$00                 
    STA $B3                  
-   STA $C0                  
+   STA $C0
+
    LDY #$06                 
    JSR CODE_D9E0
 
@@ -4838,8 +4853,9 @@ CODE_D861:
    LDA $B1                  
    AND #$FC                 
    ORA $C1                  
-   STA $B1                  
-   LDA #$00                 
+   STA $B1
+
+   LDA #$00					;reset some bits
    STA $C0                  
    RTS                      
 
@@ -4847,15 +4863,16 @@ CODE_D871:
    LDA $B1                  
    AND #$BF                 
    STA $B1
-   
+
 CODE_D877:
-   JSR CODE_EE82
-   
-   LDA #$01                 
-   ORA $00                  
-   STA $C0                  
-   LDY #$08                 
-   JMP CODE_D79D
+   JSR CODE_EE82				;add score
+
+   LDA #$01					;make side stepper kickable
+   ORA $00					;
+   STA $C0					;
+
+   LDY #$08					;draw as flipped
+   JMP CODE_D79D				;
 
 CODE_D885:   
    JSR CODE_CCA0                
@@ -5259,7 +5276,7 @@ CODE_DA7E:
    STA $C2
 
    LDA CurrentEntity_ID				;check if the entity is a fighter fly
-   CMP #CurrentEntity_ID_Fighterfly		;
+   CMP #Entity_ID_Fighterfly			;
    BNE CODE_DAC0				;
 
    LDA #<DATA_F37B				;$7B
@@ -5350,7 +5367,7 @@ CODE_DAFC:
    STA $B2
    
    LDA CurrentEntity_ID				;check what enemy is this...
-   CMP #CurrentEntity_ID_Fighterfly		;fighterfly?
+   CMP #Entity_ID_Fighterfly			;fighterfly?
    BNE CODE_DB18				;if not, return
    TYA						;
    ORA #$80					;enable some bit, IDK
@@ -5387,31 +5404,37 @@ CODE_DB2D:
 CODE_DB33:
    RTS
 
-;Play appropriate soudn for entity that's fully come out of the pipe
+;Play appropriate sound for entity that's fully come out of the pipe
 CODE_DB34:
    LDA CurrentEntity_ID					;
    LDX #Sound_Effect_ShellCreeperPipeExit		;
-   CMP #CurrentEntity_ID_Shellcreeper			;
+   CMP #Entity_ID_Shellcreeper				;
    BEQ CODE_DB4A					;
 
    LDX #Sound_Effect_SidestepperPipeExit		;
-   CMP #CurrentEntity_ID_Sidestepper			;
+   CMP #Entity_ID_Sidestepper				;
    BEQ CODE_DB4A					;
 
    LDX #Sound_Effect_FighterFlyPipeExit			;
-   CMP #CurrentEntity_ID_Fighterfly			;
+   CMP #Entity_ID_Fighterfly				;
    BEQ CODE_DB4A					;
 
    LDX #Sound_Effect_CoinPipeExit			;coins and freezies use this sound
   
 CODE_DB4A:
+;alternative code:
+;  TXA
+;  ORA Sound_Effect
+;  STA Sound_Effect
+;  RTS
+
    STX $1E						;
 
    LDA Sound_Effect					;
-   ORA $1E						;
+   ORA $1E						;play da sound effect
    STA Sound_Effect					;
    RTS							;
-   
+
 CODE_DB53:
    LDY $33
    DEY                      
@@ -5725,7 +5748,7 @@ CODE_DCEA:
    LDA #GFX_Player_Hurt				;
    STA CurrentEntity_DrawTile			;
 
-   LDA #CurrentEntity_Draw_16x24		;keep player as 16x24
+   LDA #Entity_Draw_16x24			;keep player as 16x24
    STA CurrentEntity_DrawMode			;
 
    LDA #<DATA_F6A9				;$A9                 
@@ -6964,24 +6987,24 @@ CODE_E374:
    STA BonusTimeMilliSecs_Timing		;
    
    LDA #$14					;draw 1 row with 4 tiles
-   STA BufferAddr2				;
+   STA BufferOffset2				;
    
    LDA BonusTimeSecs				;get seconds, tens
    LSR A					;
    LSR A					;
    LSR A					;
    LSR A					;
-   STA BufferAddr2+1				;
+   STA BufferAddr2				;
    
    LDA BonusTimeSecs				;seconds ones
    AND #$0F					;
-   STA BufferAddr2+2				;
+   STA BufferAddr2+1				;
    
    LDA #$66					;dot tile
-   STA BufferAddr2+3				;
+   STA BufferAddr2+2				;
    
    LDA BonusTimeMilliSecs			;milliseconds
-   STA BufferAddr2+4				;
+   STA BufferAddr2+3				;
    
    LDA #<VRAMLoc_BonusTimer			;VRAM location
    STA $00					;
@@ -6989,10 +7012,10 @@ CODE_E374:
    LDA #>VRAMLoc_BonusTimer			;
    STA $01					;
    
-   LDA #<BufferAddr2				;             
+   LDA #<BufferOffset2				;             
    STA $02					;
    
-   LDA #>BufferAddr2				;        
+   LDA #>BufferOffset2				;        
    STA $03					;
    JSR CODE_CE2C				;store into main buffer
 
@@ -7936,10 +7959,11 @@ CODE_E952:
 
 CODE_E95E:
    LDA $0428                
-   JSR CODE_EEA5                
+   JSR CODE_EEA5
+
    LDY $0429                
    JSR CODE_EC67                
-   ORA #$00                 
+   ORA #$00					;right...
    RTS
 
 ;enable fireball sound
@@ -8267,7 +8291,7 @@ CODE_EB32:
    CMP $0357                
    BNE CODE_EB42
    
-   LDA DATA_F575,X              
+   LDA DATA_F574+1,X              
    CMP $0358                
    BEQ CODE_EB4A
 
@@ -8455,48 +8479,55 @@ CODE_EC5B:
    STA $04FC                
    RTS                      
 
-   
+;check if the player have hit an entity with platform bump
+;input:
+;X - platform the entity's on
+;Y - entity's x-pos that probably should make a contact with the bump.
+;output:
+;A - 0 = contact success, non-zero (FF in this case) = contact failure
 CODE_EC67:
-   LDA #$00      
-   STA $9F   
-   STY $1F
-   
-   LDY #$00
+   LDA #$00					;
+   STA $9F					;temporary counter for impacts
+   STY $1F					;store entity's x-pos
 
-CODE_EC6F:   
-   LDA $84,Y              
-   BEQ CODE_EC91                
-   TXA                      
-   CMP $85,Y              
-   BNE CODE_EC91
-   
-   LDA $1F                  
-   SEC                      
-   SBC #$10                 
-   CMP $86,Y              
-   BCS CODE_EC91
-   
-   LDA $1F                  
-   CLC                      
-   ADC #$10                 
-   CMP $86,Y              
-   BCC CODE_EC91                
-   LDA #$00                 
-   RTS
+   LDY #$00					;check Mario's impact first
 
-CODE_EC91:  
-   INC $9F                  
-   LDY #$05
-   
-   LDA $9F                  
-   CMP #$02                 
-   BNE CODE_EC6F
-   
-   LDA #$00                 
-   STA $9F
-   
-   LDA #$FF  
-   RTS
+CODE_EC6F:
+   LDA BumpEntityVars,Y				;check bump flag
+   BEQ CODE_EC91				;
+
+   TXA						;get entity's platform index
+   CMP BumpEntityVars+1,Y			;does it match with the platform that's being bumped?
+   BNE CODE_EC91				;
+
+   LDA $1F					;check if the entity's in proximity of said bump
+   SEC						;
+   SBC #$10					;check 16 pixels ahead to the right
+   CMP BumpEntityVars+2,Y			;
+   BCS CODE_EC91				;too far to the right
+
+   LDA $1F					;more proximity
+   CLC						;
+   ADC #$10					;check 16 pixels behind to the left
+   CMP BumpEntityVars+2,Y			;
+   BCC CODE_EC91				;too far to the left
+
+   LDA #$00					;YES!
+   RTS						;
+
+CODE_EC91:
+   INC $9F					;check next player probably
+
+   LDY #$05					;luigi's impact
+   LDA $9F					;got through both players?
+   CMP #$02					;
+   BNE CODE_EC6F				;not yet, loop
+
+   LDA #$00					;
+   STA $9F					;
+
+   LDA #$FF					;epic fail, no entity has been affected
+   RTS						;
 
 CODE_ECA2:   
    LDA $04C0                
@@ -8807,7 +8838,6 @@ CODE_EE81:
    RTS						;
 
 ;Keep checking for indirects after here...
-
 CODE_EE82:
    LDA $00                  
    PHA
@@ -8820,7 +8850,8 @@ CODE_EE82:
    
    LDA #$10                 
    STA $00                  
-   LDX $9F                  
+   LDX $9F
+
    LDA #$01                 
    STA $9D,X
    
@@ -9586,7 +9617,7 @@ DATA_F4B2:
 .db $FF,$10
 
 ;Sidestepper Movement (hit once)
-.db GFX_Sidestepper_AngryMove1
+.db GFX_Sidestepper_AngryMove1				;GFX_AnimationCycle_SidestepperAngry = $1A
 .db GFX_Sidestepper_AngryMove1
 .db GFX_Sidestepper_AngryMove2
 .db GFX_Sidestepper_AngryMove2
@@ -9632,120 +9663,166 @@ DATA_F4B2:
 .db GFX_Fireball_Move4
 .db $FF,$3D
 
-;used to draw pipes
+;pipes tiles and stuff
+
+;top-left pipe
+TEMP_Def = VRAMLoc_TopPipeLeft+2
+
 DATA_F4F5:
-.db $20,$82
+.db >TEMP_Def,<TEMP_Def
 .db $04
 .db $52,$51,$3C,$50
 
-.db $20,$A0
+TEMP_Def = VRAMLoc_TopPipeLeft+$20
+.db >TEMP_Def,<TEMP_Def
 .db $06
 .db $41,$57,$56,$55,$47,$54
 
-.db $20,$C0
+TEMP_Def = VRAMLoc_TopPipeLeft+$40
+.db >TEMP_Def,<TEMP_Def
 .db $06
 .db $46,$5C,$5B,$5A,$4C,$59
 
-.db $20,$E0
+TEMP_Def = VRAMLoc_TopPipeLeft+$60
+.db >TEMP_Def,<TEMP_Def
 .db $04
 .db $49,$61,$49,$5F
 
 ;top-right pipe
-.db $20,$9A
+TEMP_Def = VRAMLoc_TopPipeRight
+
+.db >TEMP_Def,<TEMP_Def
 .db $04
 .db $39,$3C,$3A,$3B
 
-.db $20,$BA
+TEMP_Def = VRAMLoc_TopPipeRight+$20
+.db >TEMP_Def,<TEMP_Def
 .db $06
 .db $3D,$47,$3E,$3F,$40,$41
 
-.db $20,$DA
+TEMP_Def = VRAMLoc_TopPipeRight+$40
+.db >TEMP_Def,<TEMP_Def
 .db $06
 .db $42,$4C,$43,$44,$45,$46
 
-.db $20,$FC
+TEMP_Def = VRAMLoc_TopPipeRight+$62
+.db >TEMP_Def,<TEMP_Def
 .db $04
 .db $48,$49,$4A,$4B
 
 ;bottom-left pipe
-.db $22,$E0
+
+TEMP_Def = VRAMLoc_BottomPipeLeft
+.db >TEMP_Def,<TEMP_Def
 .db $04
 .db $41,$41,$41,$57
 
-.db $23,$00
+TEMP_Def = VRAMLoc_BottomPipeLeft+$20
+.db >TEMP_Def,<TEMP_Def
 .db $04
 .db $46,$46,$46,$5C
 
-.db $23,$20
+TEMP_Def = VRAMLoc_BottomPipeLeft+$40
+.db >TEMP_Def,<TEMP_Def
 .db $04
 .db $4B,$4B,$4B,$61
 
+TEMP_Def = VRAMLoc_BottomPipeRight
 ;bottom-right pipe
-.db $22,$FC
+.db >TEMP_Def,<TEMP_Def
 .db $04
 .db $40,$41,$41,$41
 
-.db $23,$1C
+TEMP_Def = VRAMLoc_BottomPipeRight+$20
+.db >TEMP_Def,<TEMP_Def
 .db $04
 .db $45,$46,$46,$46
 
-.db $23,$3C
+TEMP_Def = VRAMLoc_BottomPipeRight+$40
+.db >TEMP_Def,<TEMP_Def
 .db $04
 .db $4A,$4B,$4B,$4B
 .db VRAMWriteCommand_Stop
 
 ;POW Block update data
 ;used for buffered write.
+;first byte is a number of rows in a column
 
 DATA_F560:
 .db $22,$24,$24,$24,$24			;No POW block
 .db $22,$FE,$FF,$90,$91			;hit twice
 .db $22,$FC,$FD,$8E,$8F			;hit once
 .db $22,$FA,$FB,$8C,$8D			;full POW block
- 
-DATA_F574:
-.db $2D
 
-DATA_F575:
-.db $21,$F7,$21,$03,$22,$AB,$22,$32
-.db $21,$E8,$21,$1C,$22,$B4,$22
+;VRAM locations for platform edges that can be bumped from below (so only 2x2 tiles instead of 3x2 are shown)
+DATA_F574:
+.db $2D,$21
+.db $F7,$21
+.db $03,$22
+.db $AB,$22
+
+.db $32,$21
+.db $E8,$21
+.db $1C,$22
+.db $B4,$22
 
 DATA_F584:
-.db $AA,$F5,$CA,$F5,$58,$06,$52,$06
+.dw DATA_F5AA
+.dw DATA_F5CA
+
+.db GFX_Shellcreeper_Flipped1,Entity_Draw_8x16_Shift
+.db GFX_Shellcreeper_Walk1,Entity_Draw_8x16_Shift
 
 DATA_F58C:
-.db $AA,$F5,$EA,$F5,$D0,$03,$6C,$03
-.db $D9,$04
+.dw DATA_F5AA
+.dw DATA_F5EA
+
+;key frames for sidestepper and drawing mode
+.db GFX_Sidestepper_AngryMove1,Entity_Draw_8x16_FlickerTop
+.db GFX_Sidestepper_Move1,Entity_Draw_8x16_FlickerTop
+.db GFX_Sidestepper_Flipped1,Entity_Draw_8x16_FlickerBottom
 
 DATA_F596:
-.db $BD,$F5,$08,$F6,$E0,$04,$7D,$03
+.dw DATA_F5BD
+.dw DATA_F608
+
+.db GFX_Fighterfly_Flipped1,Entity_Draw_8x16_FlickerBottom
+.db GFX_Fighterfly_Move1,Entity_Draw_8x16_FlickerTop
 
 DATA_F59E:
-.db $0F,$F7
+.dw DATA_F70F
+.dw $0000			;unused null pointer
 
-;unused?
-.db $00,$00
-
-.db $E8,$04
+.db GFX_Freezie_Destroyed1,Entity_Draw_8x16_FlickerBottom
 
 DATA_F5A4:
-.db $E8,$F6
+.dw DATA_F6E8
+.dw $0000			;unused null pointer
 
-;unused?
-.db $00,$00
+.db $46,$07
 
-.db $46,$07,$FD,$FE,$FE,$FE,$FE,$FF
-.db $FF,$FF,$FE,$00,$FF,$00,$FE,$00
-.db $FF,$00,$00,$00,$99,$FE,$FE,$FE
-.db $FF,$FF,$FF,$00,$FF,$00,$FF,$00
-.db $00,$99,$58,$40,$5A,$40,$58,$40
-.db $5A,$30,$58,$30,$5A,$20,$58,$20
-.db $5A,$20,$58,$20,$5A,$18,$58,$10
-.db $00,$5A,$10,$58,$10,$5A,$08,$58
-.db $08,$FF,$D9,$40,$DC,$40,$D9,$40
-.db $DC,$30,$D9,$30,$DC,$20,$D9,$20
-.db $DC,$20,$D9,$18,$DC,$10,$00,$D9
-.db $10,$DC,$08,$D9,$08,$DC,$08,$FF
+DATA_F5AA:
+.db $FD,$FE,$FE,$FE,$FE,$FF,$FF,$FF
+.db $FE,$00,$FF,$00,$FE,$00,$FF,$00
+.db $00,$00,$99
+
+DATA_F5BD:
+.db $FE,$FE,$FE,$FF,$FF,$FF,$00,$FF
+.db $00,$FF,$00,$00,$99
+
+DATA_F5CA:
+.db $58,$40,$5A,$40,$58,$40,$5A,$30
+.db $58,$30,$5A,$20,$58,$20,$5A,$20
+.db $58,$20,$5A,$18,$58,$10,$00,$5A
+.db $10,$58,$10,$5A,$08,$58,$08,$FF
+
+DATA_F5EA:
+.db $D9,$40,$DC,$40,$D9,$40,$DC,$30
+.db $D9,$30,$DC,$20,$D9,$20,$DC,$20
+.db $D9,$18,$DC,$10,$00,$D9,$10,$DC
+.db $08,$D9,$08,$DC,$08,$FF
+
+DATA_F608:
 .db $E0,$60,$E3,$40,$E0,$30,$E3,$20
 .db $E0,$20,$E3,$18,$E0,$18,$E3,$10
 .db $E0,$10,$00,$E3,$08,$E0,$08,$E3
@@ -9848,10 +9925,12 @@ DATA_F6E8:
 .db $FF,$00,$DD,$48,$FF,$FF,$00,$FF
 .db $CC,$01,$DD,$49,$00,$00,$00,$00
 .db $00,$00,$CC,$05,$DD,$4D,$00,$00
-.db $00,$00,$00,$00,$00,$00,$EE,$FE
-.db $FE,$FE,$FF,$DD,$EB,$FF,$FF,$FF
-.db $00,$DD,$F0,$00,$00,$00,$00,$00
-.db $00,$EE
+.db $00,$00,$00,$00,$00,$00,$EE
+
+DATA_F70F:
+.db $FE,$FE,$FE,$FF,$DD,$EB,$FF,$FF
+.db $FF,$00,$DD,$F0,$00,$00,$00,$00
+.db $00,$00,$EE
 
 ;some initial strings on phase load
 DATA_F722:
@@ -10140,11 +10219,12 @@ CODE_F8D5:
    JSR CODE_F8C8                
    
 CODE_F8D8:
-   LDX #$00
-   
+   LDX #$00					;timer for pulse 1
+
+;used to set channel timer something
 CODE_F8DA:
-   TAY
-   LDA DATA_F900+1,y
+   TAY						;
+   LDA DATA_F900+1,y				;
    BEQ CODE_F8EB
    STA $4002,x
    LDA DATA_F900,y
@@ -10158,13 +10238,13 @@ CODE_F8EC:
    JSR CODE_F96D
    
 CODE_F8EF:
-   LDX #$04                 
+   LDX #$04					;timer for pulse 2
    BNE CODE_F8DA
 
 CODE_F8F3:   
    TXA                      
    AND #$3E                 
-   LDX #$08                 
+   LDX #$08					;timer for triangle
    BNE CODE_F8DA
 
 DATA_F8FA:
@@ -10417,8 +10497,8 @@ CODE_FA8E:
    JMP CODE_FA1E
    
 CODE_FA91:
-   LDA $FA					;seems to be related with sound effect/music playing (sound engine)
-   BNE CODE_FAD1				;play title screen music?
+   LDA $FA					;check Sound_Effect2 first
+   BNE CODE_FAD1				;
    LDY $FF					;
    LDA $F0					;
    LSR A					;
@@ -10831,9 +10911,9 @@ CODE_FCC4:
    
 CODE_FCC9:
    LDA $F9						;   
-   BNE CODE_FD27				;
+   BNE CODE_FD27					;
    
-   LDA $FC                  
+   LDA $FC						;check looping sounds
    LSR A                    
    LSR A                    
    LDX $F5                  
@@ -10899,9 +10979,9 @@ CODE_FD27:
    LDA Sound_Jingle				;
    BNE CODE_FD33				;play jingle bells!
 
-   LDA $06A2					;no jingle - no bells.
+   LDA Sound_JinglePlayingFlag			;if the jingle is still playing, continue
    BNE CODE_FD78                
-   JMP CODE_FBEC
+   JMP CODE_FBEC				;otherwise play sound effects (they won't play during jingles)
  
 CODE_FD33:
    LDY #$07					;
@@ -10910,22 +10990,23 @@ CODE_FD35:
    ASL A					;get jingle bit
    BCS CODE_FD3B				;from highest to lowest
    DEY						;
-   BNE CODE_FD35
+   BNE CODE_FD35				;
   
 CODE_FD3B:
-   INC $06A2					;
-   STY $06F2					;
-   LDA DATA_FE64,Y				;set some data up (notes or smth idk)
-   TAY
+   INC Sound_JinglePlayingFlag			;set flag to true
+   STY Sound_CurrentJingleID			;
+
+   LDA DATA_FE64,Y				;get offset for sounds first
+   TAY						;
    
-   LDA DATA_FE64,Y              
-   STA $068D
+   LDA DATA_FE64,Y				;sound speed, or how fast the notes change
+   STA $068D					;
    
-   LDA DATA_FE64+1,Y				;note data?
-   STA $F7
-   
-   LDA DATA_FE64+2,Y              
-   STA $F8
+   LDA DATA_FE64+1,Y				;\note data pointer
+   STA $F7					;|
+						;|
+   LDA DATA_FE64+2,Y				;|
+   STA $F8					;/
 
    LDA DATA_FE64+3,Y
    STA $F9
@@ -10933,8 +11014,8 @@ CODE_FD3B:
    LDA DATA_FE64+4,Y              
    STA $FA
    
-   LDA DATA_FE64+5,Y
-   STA $0686
+   LDA DATA_FE64+5,Y				;uhh, something???
+   STA $0686					;seems to be only used for Sound_Jungle_TitleScreen
    
    LDA #$01                 
    STA $0695                
@@ -10957,7 +11038,8 @@ CODE_FD78:
    BEQ CODE_FDBE                
    BPL CODE_FD95                
    JSR CODE_F987
-   STA $0691                
+   STA $0691
+
    LDY $FA                  
    INC $FA                  
    LDA ($F7),Y
@@ -10985,24 +11067,26 @@ CODE_FDAF:
    DEC $0695                
    BNE CODE_FE02                
    LDY $0682                
-   INC $0682                
+   INC $0682
+
    LDA ($F7),Y              
    BNE CODE_FDDA
   
 CODE_FDBE:
    JSR CODE_F8C2
-   
+
+;music over
    LDA #$00                 
    STA $FA                  
    STA $F9                  
    STA $F0                  
    STA $FB                  
    STA $06A2                
-   STA $06C0                
-   STA $4008
+   STA $06C0					;
+   STA $4008					;no more triangle
    
-   LDA #$10                 
-   STA $4004                
+   LDA #$10					;constant volume
+   STA $4004					;
    RTS
   
 CODE_FDDA:
@@ -11013,9 +11097,9 @@ CODE_FDDA:
    JSR CODE_F8EF                
    BEQ CODE_FE02
    
-   LDX #$9F                 
-   LDA $06F2                
-   BEQ CODE_FDFA
+   LDX #$9F					;set pulse constant max volume
+   LDA Sound_CurrentJingleID			;
+   BEQ CODE_FDFA				;check if current jingle is Sound_Jingle_GameStart, if so, skip over
    
    LDX #$87                 
    LDA $0695                
@@ -11029,7 +11113,6 @@ CODE_FDFA:
    
    LDA #$7F                 
    STA $4005                
-
    
 CODE_FE02:
    LDY $F9                  
@@ -11050,19 +11133,21 @@ CODE_FE02:
    LDA #$38
   
 CODE_FE20:
-   LDY $06F2                
-   BNE CODE_FE27
+   LDY Sound_CurrentJingleID			;check if current jingle is Sound_Jingle_GameStart
+   BNE CODE_FE27				;if not, set triangle channel value from above
    
-   LDA #$FF
+   LDA #$FF					;max triangle settings
 
 CODE_FE27:   
-   STA $4008                
+   STA $4008					;triangle stuff
+
    JSR CODE_F8F3
   
 CODE_FE2D:
-   LDA $06F2
-   CMP #$07
-   BNE CODE_FE63                
+   LDA Sound_CurrentJingleID
+   CMP #$07					;Sound_Jungle_TitleScreen>>4 ?
+   BNE CODE_FE63
+
    DEC $069A                
    BNE CODE_FE63
    
@@ -11094,16 +11179,30 @@ CODE_FE63:
    RTS                      
 
 DATA_FE64:
+;first 8 bytes are offsets foreach Sound_Jingle entry
 .db $08,$0D,$12,$17,$1C,$21,$26,$2B
-.db $0F,$95,$FE,$30,$00,$00,$D1,$FE
-.db $00,$08,$00,$E6,$FE,$0A,$00,$0F
-.db $F3,$FE,$00,$00,$07,$FC,$FE,$03
-.db $00,$00,$0B,$FF,$00,$00,$07,$0D
-.db $FF,$18,$00,$16,$44,$FF,$1F,$38
-.db $7E,$5D,$78,$5D,$78,$5C,$78,$5C
-.db $62,$E6,$65,$5E,$65,$5E,$64,$5E
-.db $40,$5E,$F8,$00      
-   
+
+;after which there are 5 bytes per entry, with the exception of the very last entry thats 6 bytes long (technically every entry is 6 bytes long, with last byte being the first for next entry, but that value isn't used)
+;first byte is a speed at which the jingle is played, the lower value is, the faster
+;second and third are a pointer to note data
+;forth byte is ?
+;fifth byte is *probably* an offset for a paired set of data (like you have two different data tables used together)
+.db $0F,<DATA_FE95,>DATA_FE95,$30,$00
+.db $00,<DATA_FED1,>DATA_FED1,$00,$08
+.db $00,<DATA_FEE6,>DATA_FEE6,$0A,$00
+.db $0F,<DATA_FEF3,>DATA_FEF3,$00,$00
+.db $07,<DATA_FEFC,>DATA_FEFC,$03,$00
+.db $00,<DATA_FF0B,>DATA_FF0B,$00,$00
+.db $07,<DATA_FF0D,>DATA_FF0D,$18,$00
+.db $16,<DATA_FF44,>DATA_FF44,$1F,$38,$7E
+
+;$00 - stop command
+DATA_FE95:
+.db $5D,$78,$5D,$78,$5C,$78,$5C,$62
+.db $E6,$65,$5E,$65,$5E,$64,$5E,$40
+.db $5E,$F8,$00      
+
+;Unused! some kinda test jingle? or supposed to be played with something else or different settings or w/e?
 DATA_FEA8:
 .db $85,$06,$81,$26,$85,$06,$81,$26
 .db $06,$26,$06,$0E,$83,$12,$85,$10
@@ -11112,25 +11211,52 @@ DATA_FEA8:
 
 DATA_FEC5:
 .db $5D,$78,$5D,$78,$1D,$5F,$40,$5F
-.db $40,$9E,$80,$F8,$6E,$6A,$A6,$A6
-.db $A6,$AE,$07,$00,$82,$46,$38,$32
-.db $4A,$48,$81,$40,$42,$44,$48,$84
-.db $30,$66,$6E,$4A,$50,$52,$50,$4A
-.db $6E,$27,$00,$E6,$DE,$39,$04,$12
-.db $04,$12,$04,$12,$04,$D2,$00,$83
-.db $83,$00,$46,$46,$4E,$52,$42,$4E
-.db $12,$14,$16,$18,$1A,$05,$E6,$00
+.db $40,$9E,$80,$F8
+
+DATA_FED1:
+.db $6E,$6A,$A6,$A6,$A6,$AE,$07,$00
+
+DATA_FED9:
+.db $82,$46,$38,$32,$4A,$48,$81,$40
+.db $42,$44,$48,$84,$30
+
+DATA_FEE6:
+.db $66,$6E,$4A,$50,$52,$50,$4A,$6E
+.db $27,$00
+
+;...
+.db $E6,$DE,$39
+
+DATA_FEF3:
+.db $04,$12,$04,$12,$04,$12,$04,$D2
+.db $00
+
+DATA_FEFC:
+db $83,$83,$00
+
+;...
+.db $46,$46,$4E,$52,$42,$4E
+.db $12,$14,$16,$18,$1A,$05
+
+DATA_FF0B:
+.db $E6,$00
+
+DATA_FF0D:
 .db $2E,$46,$02,$AE,$6A,$67,$28,$6A
 .db $02,$A6,$64,$63,$9E,$A4,$6A,$47
 .db $08,$4B,$02,$0C,$4F,$02,$07,$00
 .db $86,$A6,$A2,$9C,$AA,$A2,$9C,$BC
 .db $9E,$BC,$B6,$B2,$26,$24,$26,$24
 .db $A6,$22,$1E,$22,$1E,$A2,$1C,$00
-.db $1C,$00,$1C,$00,$1C,$00,$1D,$47
-.db $EA,$42,$66,$AA,$AC,$6A,$A6,$47
-.db $EA,$42,$66,$AA,$AC,$6A,$A6,$6A
-.db $AC,$86,$6C,$AA,$6C,$86,$8A,$46
-.db $4A,$4E,$D0,$D2,$11,$00,$77,$76
+.db $1C,$00,$1C,$00,$1C,$00,$1D
+
+DATA_FF44:
+.db $47,$EA,$42,$66,$AA,$AC,$6A,$A6
+.db $47,$EA,$42,$66,$AA,$AC,$6A,$A6
+.db $6A,$AC,$86,$6C,$AA,$6C,$86,$8A
+.db $46,$4A,$4E,$D0,$D2,$11,$00
+
+.db $77,$76
 .db $F6,$5D,$5C,$DC,$77,$76,$F6,$5D
 .db $5C,$DC,$65,$64,$E4,$7F,$7E,$FE
 .db $BE,$B6,$9C,$B8,$A4,$9C,$F6,$82
@@ -11153,6 +11279,8 @@ DATA_FEC5:
 
    .org $FFFA						;Interrupt vectors at set location
 
-   .dw NMI
-   .dw RESET
-   .dw RESET
+   .dw NMI_C07D
+   .dw RESET_C000
+   .dw RESET_C000
+
+  .incbin MarioBrosGFX.bin				;i'll leave this so I don't have to add this each time

@@ -91,13 +91,29 @@ Demo_InputTimer_P1 = $56			;/
 Demo_InputIndex_P2 = $57			;\player 2
 Demo_InputTimer_P2 = $58			;/
 
-TimerBackup = $5A				;stores backups of timers $2A-$2E, same size
+TimerBackup = $5A				;stores backups of timers $2A-$2E, 5 bytes
 
 POWHitsLeft = $70
 POWPowerTimer = $71				;timer set when POW is hit, to run hit interaction with everything on-screen. 
 POWWhoHit = $72					;contains entity ID of which player hit the block (to count score for each enemy affected by POW)
 
-;7E-83 - unused
+;$74-$7D are bump block variables. the VRAM position and other values are stored here when the platform is bumped.
+;5 bytes per player, with first 5 being for Mario.
+;$74 and $79 seem to be unused, they're always set to 0 and aren't checked. 
+;$75 and $7A are bump tile graphic offset, used to determine wether the bump has occured and which graphic to use
+;$76 and $7B are used as bump animation 
+;$77-78 and $7C-7D are bump tiles VRAM position, top-left tile of either 2x2 or 3x2 bump area
+BumpBlockVars = $74
+
+;$7E-$83 - unused
+
+;$84-$8B are used for bumping platforms for entity interaction.
+;$84 and $89 are flags to indicate that we've bumped a platform
+;$85 and $8A store which platform we've bumped
+;$86 and $8B store where the impact have occured.
+BumpEntityVars = $84
+
+;$87 and $88 are unused
 
 ;$90 is probably used but idk what its for, same for 94 and 98
 ;but for what?
@@ -110,34 +126,42 @@ Player2Score = $99				;3 bytes
 PlayerScoreUpdate = $9D				;base address
 Player1ScoreUpdate = PlayerScoreUpdate
 Player2ScoreUpdate = PlayerScoreUpdate+1	;seems to be another flag for score display for player 2, except this doesn't handle "II" tile on screen.
-PlayerPOWScoreUpdate = $9F			;used to enable score update flag for the player who hit the POW (contains index for above 2 addresses)
+PlayerPOWScoreUpdate = $9F			;used to enable score update flag for the player who hit the POW (contains index for above 2 addresses). sometimes used as a scratch ram also.
 
 Player1_Got1UPFlag = $AD			;a flag for wether the player has gotten a 1-up by obtaining a certain amoutnt of score
 Player2_Got1UPFlag = $AE			;same but for player 2
 
 CurrentEntity_ActiveFlag = $B0			;flag for current entity wether it exists or not
+;CurrentEntity_MovementBits = $B1		;used to idicate various movement states
 CurrentEntity_Bits = $B1			;bits used for various entities for various purposes. some enemies use bits 0 and 1 for movement direction (bit 0 - move right, bit 1 - move left)
 CurrentEntity_Timer = $B3			;general entity timer used for various things
 CurrentEntity_AnimationPointer = $B4		;used to animate by pointing to a CurrentEntity_DrawTile in a table (when FF, it loops to the first value of the animation)
 CurrentEntity_DrawMode = $B5			;how to draw i entity?
 CurrentEntity_DrawTile = $B6			;first sprite tile it's drawing
-;B7
+CurrentEntity_TileProps = $B7			;I think it's about right
 CurrentEntity_YPos = $B8
 CurrentEntity_XPos = $B9
+;$BC-$BD - some kinda pointer...
 CurrentEntity_CurrentPlatform = $BE
 CurrentEntity_ID = $BF
+;C0 - some kinda bits, one of those bits indicate wether the enemy can be kicked
 ;$C1 - misc entity ram?
-;CurrentEntity_Timer = $C2			;some kinda of timer, i think (maybe misc ram, not necessarily a timer)
+;CurrentEntity_MovementTimer = $C2		;some kinda of timer, i think (maybe misc ram, not necessarily a timer)
 ;C3
 ;CurrentEntity_Misc = $C4			;used for various purposes depending on current entity. for player character, this is used as a counter for skidding when moving horizontally, increments up to 2. 0 - start slow, 1 - move but no skid when turning, 02 - skid when turning
 CurrentEntity_XSpeed = $C5
 CurrentEntity_State = $C6
-;CA - Unknown
+;C9 - Used by player entities to calculate current 8x8 VRAM position their top-right sprite tile is at (also below)
+;CA - high byte for above
 CurrentEntity_HitBoxYPos = $CE
 CurrentEntity_HitBoxXPos = $CF
 
+;$D0-$EF - Unused
+
 ;Sound addresses
-;those are bitwise, each sound is it's own bit.
+Sound_MusicDataPointer = $F7			;2 bytes, indirect addressing
+
+;those are bitwise, each sound/sound is it's own bit.
 Sound_Base = Sound_Loop				;used as a base address for sound addresses 
 Sound_Loop = $FC				;some looping sounds
 Sound_Jingle = $FD				;various jingles
@@ -145,6 +169,10 @@ Sound_Effect = $FE				;sound effects
 Sound_Effect2 = $FF				;more sound effects
 
 Entity_Address = $0300				;from $0300 to $460 are used for enities, each using $20 bytes.
+
+;Luigi is entity ID 2 (ID 0 doesn't mean anything)
+Entity_Luigi_AnimationPointer = $0324
+Entity_Luigi_XPos = $0329
 
 TESTYOURSKILL_Flag = $04B0			;this flag is used to tell wether the phase we're loading is a TEST YOUR SKILL one
 BonusTimeSecs = $04B1
@@ -175,12 +203,17 @@ PhaseStringTimer = $04F1			;for how long PHASE X string will be shown on string
 
 RandomNumberStorage = $0500
 
-;rename to BufferAddr2? it's not only for bumped tiles, but for more
-BumpTileBuffer = $0540				;contains tiles for bump tiles to be transferred into actual buffer, basically BufferOffset and BufferAddr for bumped tiles (7 bytes max). it's also used for phase strings upon phase load
-BufferAddr2 = $0540				;used to transfer into BufferAddr for proper buffered write
+;secondary buffer for tiles, that transfers values into a main buffer. used for bump tiles animation and some strings.
+BufferOffset2 = $0540				;now that I think of it this isn't used as offset the same way as common buffer. in fact, it can have just draw size and stuff (e.g. draw a 3x2 image)
+BufferAddr2 = $0541				;
 
 BufferOffset = $0590				;used to offset buffer position
 BufferAddr = $0591				;buffer for tile drawing of unknown size.
+
+Sound_JinglePlayingFlag = $06A2			;indicates if there's a jingle playing at the moment
+Sound_CurrentJingleID = $06F2			;indicates ID of the current jingle that's playing (detoned by bit number)
+
+;$05FF - some sort of "disable control flag" that's set when players collide with each other?
 
 ;OAM base ram addresses
 OAM_Y = $0200
@@ -243,7 +276,6 @@ APU_FrameCounter = $4017
 ;Constants
 
 ;VRAM Write routine values, used as commands
-
 VRAMWriteCommand_Repeat = $40			;bit 6 will make repeat writes of one value
 VRAMWriteCommand_DrawVert = $80			;bit 7 - change drawing from horizontal line to vertical
 VRAMWriteCommand_Stop = $00			;command to stop VRAM write and return from routine.
@@ -296,22 +328,28 @@ Sound_Effect2_Step = $80			;when player moves around, sound changes slightly eve
 Demo_EndCommand = $AA
 
 ;Entity addresses' values
-;those are most likely shared like moving for players and other entities are the same. we'll see...
+;those are most likely shared like moving for players and other entities are the same.
 ;$B1
-CurrentEntity_Bits_MovingRight = $01
-CurrentEntity_Bits_MovingLeft = $02
-CurrentEntity_Bits_Skidding = $04
-CurrentEntity_Bits_Fall = $40
-CurrentEntity_Bits_Jump = $80			;used by mario and fighterflies
+Entity_MovementBits_MovingRight = $01
+Entity_MovementBits_MovingLeft = $02
+Entity_MovementBits_Skidding = $04		;probably exclusive to players
+Entity_MovementBits_CantMove = $08		;used by players when they're squished
+Entity_MovementBits_Fall = $40
+Entity_MovementBits_Jump = $80			;used by mario and fighterflies
+
+;$B4
+GFX_AnimationCycle_PlayerWalking = $00
+GFX_AnimationCycle_SidestepperAngry = $1A
 
 ;$B5
-CurrentEntity_Draw_16x24 = 0			;used by mario and luigi
-CurrentEntity_Draw_16x16 = 1			;used by coin effect (kinda popping effect that looks 16x16)
-CurrentEntity_Draw_8x16_AnimFlicker = 2		;this is used by by sidestepper, top tile flickers
-CurrentEntity_Draw_8x16_Flicker = 3		;used by sidesteppers and fighterflies, they change top tile position every frame. (TO-DO: RENAME, not exactly accurate, at least in that it's not used by fighter flies)
-CurrentEntity_Draw_8x16 = 5			;8x16. used by coins, freezies and other effects
-CurrentEntity_Draw_8x16_Shift = 6		;8x16 but the top tile is slightly shifter horizontally. used by Shellcreepers
-CurrentEntity_Draw_8x8 = 7			;should be obvious, used for fireballs and various effects
+Entity_Draw_16x24 = 0				;used by mario and luigi
+Entity_Draw_16x16 = 1				;used by coin effect (kinda popping effect that looks 16x16)
+Entity_Draw_8x16_AnimFlicker = 2		;this is used by by sidestepper, top tile flickers
+Entity_Draw_8x16_FlickerTop = 3			;used by sidesteppers and fighterflies, they change top tile position every frame. (TO-DO: RENAME, not exactly accurate, at least in that it's not used by fighter flies)
+Entity_Draw_8x16_FlickerBottom = 4		;used by sidesteppers when flipped over, same as above, but it's the bottom tile that flickers
+Entity_Draw_8x16 = 5				;8x16. used by coins, freezies and other effects
+Entity_Draw_8x16_Shift = 6			;8x16 but the top tile is slightly shifter horizontally. used by Shellcreepers
+Entity_Draw_8x8 = 7				;should be obvious, used for fireballs and various effects
 
 ;Entity graphics (first tile for each, after which +1 is added for others)
 ;$B6
@@ -329,6 +367,8 @@ GFX_Shellcreeper_Walk1 = $52
 GFX_Shellcreeper_Walk2 = $54
 GFX_Shellcreeper_Walk3 = $56
 
+GFX_Shellcreeper_Flipped1 = $58
+
 GFX_Sidestepper_Move1 = $6C
 GFX_Sidestepper_Move2 = $6F
 GFX_Sidestepper_Move3 = $72
@@ -337,9 +377,13 @@ GFX_Sidestepper_AngryMove1 = $D0
 GFX_Sidestepper_AngryMove2 = $D3
 GFX_Sidestepper_AngryMove3 = $D6
 
+GFX_Sidestepper_Flipped1 = $D9
+
 GFX_Fighterfly_Move1 = $7D
 GFX_Fighterfly_Move2 = $80
 GFX_Fighterfly_Move3 = $83
+
+GFX_Fighterfly_Flipped1 = $E0
 
 GFX_Coin_Frame1 = $A1
 GFX_Coin_Frame2 = $A3
@@ -360,12 +404,15 @@ GFX_Fireball_Move2 = $93
 GFX_Fireball_Move3 = $94
 GFX_Fireball_Move4 = $95
 
+GFX_Freezie_Destroyed1 = $E8
+
 ;$BF
-CurrentEntity_ID_Mario = $01			;i suspect luigi is #$02
-CurrentEntity_ID_Shellcreeper = $10
-CurrentEntity_ID_Sidestepper = $20
-CurrentEntity_ID_Fighterfly = $30
-CurrentEntity_ID_Coin = $40
+Entity_ID_Mario = $01			;i suspect luigi is #$02
+Entity_ID_Shellcreeper = $10
+Entity_ID_Sidestepper = $20
+Entity_ID_Fighterfly = $30
+Entity_ID_Coin = $40
+Entity_ID_Freezie = $80
 
 ;States for entities
 ;$C6
@@ -405,6 +452,7 @@ RespawnPlatform_Tile2 = $CE
 RespawnPlatform_Tile3 = $CF
 
 ;various VRAM tile defines
+VRAMTile_Empty = $24				;empty tile of transparency
 VRAMTile_Bricks = $92				;those bricks at the very bottom of the level
 VRAMTile_PlatformBase = $93			;used as a base value for platforms, they have different look depending on how far you're in the game
 
@@ -413,7 +461,16 @@ VRAMLoc_Player1Score = $2064			;position of the leftmost digit of player 1's sco
 VRAMLoc_TOPScore = $206E			;
 VRAMLoc_Player2Score = $2077			;
 
+VRAMLoc_TopPipeLeft = $2080			;position for top-right 8x8 row in 6x4 (8x8 tile) object
+VRAMLoc_TopPipeRight = $209A
+
+;the bottom pipes are 4x3 tiles
+VRAMLoc_BottomPipeLeft = $22E0
+VRAMLoc_BottomPipeRight = $22FC
+
 VRAMLoc_BonusTimer = $20AE			;location for TEST YOUR SKILL timer
 
 ;Other misc values
 TensHundredsThousandsScoreFor1Up = $02		;used to check if having enough score to reward a 1-up. checking for thousands and hundreds requires changing address (e.g. Player2Score+1). checking for both requires additional code.
+
+;DATA_F5A4
