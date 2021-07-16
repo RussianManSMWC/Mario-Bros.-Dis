@@ -1,0 +1,1 @@
+you can use this python script to extract graphics from Mario Bros ROM, you need to get a clean ROM file, put in the same folder as this script, then run the script to get graphics in .bin format for use with disassembly.
