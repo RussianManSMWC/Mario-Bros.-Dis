@@ -4,7 +4,8 @@ It's not fully documented, so you can contribute by sending pull requests or som
 
 I didn't included graphics data for it, you'll have to get it yourself (you can use included python script under "misc" folder to rip graphics from the ROM image).
 
-Assembles with "asm6" assembler.
+Assembles with "CC65" compiler/assembler (there's also asm6 version if you want).
 
 TO DO:
-Disassemble "Classic Serie" version.
+-Disassemble "Classic Serie" version.
+-Add support for European and GameCube versions
