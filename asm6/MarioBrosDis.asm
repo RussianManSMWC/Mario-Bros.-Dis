@@ -1,4 +1,3 @@
-;line 290
 ;Mario Bros. (NES) Disassembly.
 ;not very well documented yet.
 ;But it's pretty much an accurate byte-to-byte MB. disassembly.
