@@ -129,7 +129,9 @@ POWWhoHit = $72					;contains entity ID of which player hit the block (to count 
 ;$77-78 and $7C-7D are bump tiles VRAM position, top-left tile of either 2x2 or 3x2 bump area
 BumpBlockVars = $74
 
-;$7E-$83 - unused
+;$7E-$83 - unused... with one exception
+
+PAL_SpeedAlterationTimer = $80			;used exclusively for PAL version (and, by extension, Mario Bros. Classic, though it uses a different address) to modify player and fireballs' x-speeds. when hits zero, their speed is altered slightly.
 
 ;$84-$8B are used for bumping platforms for entity interaction.
 ;$84 and $89 are flags to indicate that we've bumped a platform
@@ -436,7 +438,7 @@ RandomNumberStorage = $0500			;4 bytes
 ;the second byte of each pair also gets overwritten with tile value at the same VRAM position, then stored to CurrentEntity addresses
 ;other entities only reserve one pair, since they don't have a ceiling collision, only the bottom tile they're intersecting is checked
 Entity_VRAMPosition = $0520
-Entity_VRAMTile = Entity_VRAMPosition			;the tile is stored in the same address as the position, it'll get refreshed on the next frama
+Entity_VRAMTile = Entity_VRAMPosition			;the tile is stored in the same address as the position, it'll get refreshed on the next frame
 ;Entity_VRAMTileTop = Entity_VRAMPosition+1
 ;Entity_VRAMTileBottom = Entity_VRAMPosition+3
 
@@ -450,7 +452,7 @@ BufferAddr = $0591				;buffer for tile drawing of unknown size.
 Entity_InteractionSide = $05F7			;direction bits from which the interaction between two entities has occured (between player and another entity or two players). Format: UD----RL, U - up, D - down, L - left, R - right.
 Entity_SavedMovementDir = $05F8			;used by sidestepper after being bumped once so it continues moving in the same direction it previously did
 Entity_QuakeYPosOffset = $05F9			;when the POW is hit, the screen shakes, this is used to offset Y-position alongside the screen
-;Entity_VRAMPositionIndex = $05FA
+Entity_VRAMPositionIndex = $05FA		;offset for Entity_VRAMPosition, different for different entities (naturally)
 Entity_ComingOutOfLeftPipeFlag = $05FB		;is set when an entity is coming out of the left pipe
 Entity_ComingOutofRightPipeFlag = $05FC		;is set when an entity is coming out of the right pipe
 
@@ -549,6 +551,8 @@ Input_Down = $04
 Input_Left = $02
 Input_Right = $01
 
+BonusTimerMilliSecondTiming = $06		;how long does it take to decrease bonus phase's timer by 1 millisecond (PAL version makes this value lower by 1)
+
 ;Sound values
 ;$FC
 Sound_Loop_Timer = $04				;from TEST YOUR SKILL
@@ -619,8 +623,8 @@ FireballMovementAnimCycle_Start = FireballMovementAnimCycle-EntityMovementAnimat
 Entity_Draw_16x24 = 0				;used by mario and luigi
 Entity_Draw_16x16 = 1				;used by coin effect (kinda popping effect that looks 16x16) and players when squished
 Entity_Draw_8x16_AnimFlicker = 2		;this is used by by sidestepper, top tile flickers (what is this used by now that I think about it...)
-Entity_Draw_8x16_FlickerTop = 3			;used by sidesteppers and fighterflies, they change top tile position every frame. (TO-DO: RENAME, not exactly accurate, at least in that it's not used by fighter flies) (ACTUALLY IT IS???!!!)
-Entity_Draw_8x16_FlickerBottom = 4		;used by sidesteppers when flipped over, same as above, but it's the bottom tile that flickers
+Entity_Draw_8x16_FlickerTop = 3			;used by sidesteppers and fighterflies, they change top tile position every frame.
+Entity_Draw_8x16_FlickerBottom = 4		;used by sidesteppers and fighterflies when flipped over, same as above, but it's the bottom tile that flickers
 Entity_Draw_8x16 = 5				;8x16. used by coins, freezies and other effects
 Entity_Draw_8x16_Shift = 6			;8x16 but the top tile is slightly shifted horizontally. used by Shellcreepers
 Entity_Draw_8x8 = 7				;should be obvious, used for fireballs and various effects
@@ -743,7 +747,10 @@ CoinXMovementData_Start = ShellcreeperXMovementData_Start	;same as above
 ;States for entities
 ;$C6
 Player_State_Dead = $01				;game over or init respawn platform
-Player_State_AppearAfterDeath = $02
+Player_State_AppearAfterDeath = $02		;moves down on respawn platform
+Player_State_P1OnRespawnPlatform = $04		;currently on respawn platform and hasn't moved yet (player 1)
+Player_State_P2OnRespawnPlatform = $08		;player 2
+Players_State_OnRespawnPlatform = Player_State_P1OnRespawnPlatform|Player_State_P2OnRespawnPlatform
 Player_State_Hurt = $10
 Player_State_Splash = $20			;player turned into a splash after falling down
 
@@ -846,6 +853,11 @@ VRAMLoc_BonusTimer = $20AE			;location for TEST YOUR SKILL timer
 
 ;Other misc values
 TensHundredsThousandsScoreFor1Up = $02		;used to check if having enough score to reward a 1-up. checking for thousands and hundreds requires changing address (e.g. Player2Score+1). checking for both requires additional code.
+
+;version defines, don't touch
+NTSC = 0
+PAL = 1
+Gamecube = 2
 
 ;easy OAM props, don't change these
 OAMProp_YFlip = %10000000

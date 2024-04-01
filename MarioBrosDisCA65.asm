@@ -7,6 +7,16 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+.include "Defines.asm"				;load all defines for RAM addresses
+
+;Set version with this define. Use one of the following arguments
+;NTSC
+;PAL
+;Gamecube
+;or you can use number 0-2 for respective version.
+
+Version = NTSC
+
 .segment "HEADER"
 .include "iNES_Header.asm"
 
@@ -15,10 +25,50 @@
 .segment "TILES"
 .incbin "MarioBrosGFX.bin"			;graphics
 
-.segment "CODE"
-.include "Defines.asm"				;load all defines for RAM addresses
-.include "CharacterSet.asm"			;this game's character set and special characters used in strings
+.if Version = Gamecube
+.segment "GCPADDING"
+;there will be padding here...
 
+;padding ends here
+.segment "GCCODE"
+
+Gamecube_CODE_BFD0:
+   LDX NonGameplayMode				;check if loading the title screen
+   BNE Gamecube_CODE_BFD7			;
+   JMP CODE_C58E				;obviously, can't select options yet
+
+Gamecube_CODE_BFD7:
+   LDY Cursor_Option				;
+   INY						;
+   CMP #Input_Select				;if pressed select, cursor goes down (like in vanilla)
+   BEQ Gamecube_CODE_BFEB			;
+   CMP #Input_Down				;if pressed down on d-pad, cursor goes down (like in not vanilla but pretty much any game you can think of)
+   BEQ Gamecube_CODE_BFEB			;
+   DEY						;cursor will go up if...
+   DEY						;
+   CMP #Input_Up				;...if pressed up
+   BEQ Gamecube_CODE_BFEB			;
+   JMP CODE_C568				;
+
+Gamecube_CODE_BFEB:
+   CPX #$01					;
+   BEQ Gamecube_CODE_BFF2			;are we on the title screen?
+   JMP CODE_C561				;do return to the title screen
+
+Gamecube_CODE_BFF2:
+   LDA TitleScreen_SelectHeldFlag		;
+   BEQ Gamecube_CODE_BFF9			;
+   JMP CODE_C574				;
+
+Gamecube_CODE_BFF9:
+   TYA						;change selected option
+   AND #$03					;
+   TAY						;
+   JMP CODE_C55C				;
+.endif
+
+.segment "CODE"
+.include "CharacterSet.asm"			;this game's character set and special characters used in strings
 .feature force_range				;allows -$xx expressions (for negative values)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -67,8 +117,8 @@ RAMResetLoop_C01D:
 CODE_C02B:
    STX RandomNumberStorage			;otherwise it starts at 1, 2 or 3 depending on POW block state before reset
 
-   JSR CODE_CA1B				;clear screen(s)
-   JSR CODE_CA2B				;"clear" sprite data
+   JSR ClearScreenAndAttributesInit_CA1B	;clear screen(s) and attributes
+   JSR RemoveSpriteTiles_CA2B			;no more sprite tiles
 
    LDY #$00					;load 00 into Y register....
    STA VRAMRenderAreaReg			;\initial camera position/no scroll
@@ -99,7 +149,7 @@ CODE_C04F:
    BNE CODE_C060				;
 
 CODE_C05D:
-   JSR CODE_F8A7				;sound engine
+   JSR SoundEngine_F8A7				;sound engine
 
 CODE_C060:
    JSR HandleGlobalTimers_CD88			;handle various timers
@@ -1010,7 +1060,11 @@ DATA_C510:
 
 CODE_C528:
    LDA Controller1InputHolding			;
+.if Version = Gamecube				;count ups and downs in the gamecube version (modernize selecting options on the title screen)
+   AND #Input_Select|Input_Start|Input_Up|Input_Down
+.else
    AND #Input_Select|Input_Start		;
+.endif
    CMP #Input_Start				;if player pressed start, start the game
    BNE CODE_C543				;
 
@@ -1018,17 +1072,22 @@ CODE_C528:
    STA DemoFlag					;|reset demo flag
    STA GameplayMode				;/initialize gameplay
 
-   JSR CODE_D4FE				;
-   JSR CODE_E132				;
+   JSR MuteSounds_D4FE				;
+   JSR DisableRender_E132			;
 
    LDA #$02					;
-   STA $2A					;
-   STA $2D					;
+   STA TimingTimer				;quit demo
+   STA TransitionTimer				;
    RTS						;
 
 CODE_C543:
+.if Version = Gamecube
+   JMP Gamecube_CODE_BFD0			;a hijack
+   NOP						;
+.else
    LDX NonGameplayMode				;\if it's title screen init
    BEQ CODE_C58E				;/don't check things
+.endif
    CMP #Input_Select                 		;\check if pressed select
    BNE CODE_C568                		;/
    CPX #$01                 			;\if select was pressed, but it's not a title screen
@@ -1049,7 +1108,7 @@ CODE_C55C:
    JMP CODE_C570				;
 
 CODE_C561:
-   JSR CODE_D4FE				;mute sounds (not that they play during demo anyways...)
+   JSR MuteSounds_D4FE				;mute sounds (not that they play during demo anyways...)
 
    STA NonGameplayMode				;initialize title screen
    BEQ CODE_C58E				;
@@ -1103,10 +1162,13 @@ DATA_C593:
    .word CODE_D448				;reset pointer
 
 CODE_C5A3:
+.if Version = PAL
+   JSR PAL_CODE_C5DE				;alter speed of fireballs and players
+.endif
    JSR CODE_D56E				;spawn enemy entities if needed
    JSR CODE_D202				;handle bumping tiles
    JSR CODE_D301				;apply POW's screen shake if needed
-   JSR CODE_C5DB				;run players coding
+   JSR HandlePlayerEntities_C5DB		;run players coding
    JSR CODE_C66A				;process entities (other than player)
    JSR CODE_E783				;transfer entities per-platform counters
    JSR CODE_EA31				;handle reflecting fireball
@@ -1125,7 +1187,19 @@ CODE_C5A3:
    STA UpdateEntitiesFlag			;can update entity variables (for NMI)
    RTS						;
 
-CODE_C5DB:
+.if Version = PAL
+PAL_CODE_C5DE:
+   DEC PAL_SpeedAlterationTimer			;tick this special speed-altering timer
+   BPL PAL_CODE_C5E6				;
+
+   LDA #$03					;
+   STA PAL_SpeedAlterationTimer			;refresh this mysterious variable
+
+PAL_CODE_C5E6:
+   RTS						;
+.endif
+
+HandlePlayerEntities_C5DB:
    LDA #<Entity_Address				;
    STA $A0					;
 
@@ -1137,7 +1211,7 @@ CODE_C5DB:
 
    LDA #$00					;
    STA $A2					;
-   STA $05FA					;
+   STA Entity_VRAMPositionIndex			;
 
    LDA Controller1InputPress			;mario's control inpits
    STA Entity_Mario_ControllerInputs		;
@@ -1151,8 +1225,8 @@ CODE_C5F8:
    LDA CurrentEntity_ActiveFlag			;is the player active?
    BNE CODE_C605				;if so, do the normal player stuff
 
-   JSR CODE_DFBA				;some kinda counter
-   JMP CODE_C65D				;skip over most of the code
+   JSR SkipPlayerVRAMPosition_DFBA		;move onto next player's VRAM alignment stuff
+   JMP CODE_C65D				;next player
 
 CODE_C605:
    JSR CODE_D019				;get the platform level for the player
@@ -1166,7 +1240,7 @@ CODE_C605:
    AND #$F0					;10 to F0 - got hurt
    BNE CODE_C629				;
 
-;$C6 = 01 through 0F
+;CurrentEntity_Player_State = 01 through 0F
    LDA PhaseCompleteFlag			;did we win???
    BNE CODE_C62C				;if so, skip stuff
 
@@ -1174,16 +1248,16 @@ CODE_C605:
 
    LDA CurrentEntity_Player_State		;check if escaped the respawn platform or something
    BEQ CODE_C636				;
-   AND #$0C					;bits 3 and 2
+   AND #Players_State_OnRespawnPlatform		;on reaspawn platform (the platform slowly disappears)
    BNE CODE_C636				;if any is enabled, some other stuff
-   BEQ CODE_C62C
+   BEQ CODE_C62C				;
 
 CODE_C629:
    JSR CODE_DDE0				;run hurt player (freeze, fall down, splash)
 
 CODE_C62C:
-   JSR CODE_DFBA				;
-   JMP CODE_C657				;
+   JSR SkipPlayerVRAMPosition_DFBA		;won't process tiles, prepare next player/entity's index for VRAM alignment
+   JMP CODE_C657				;skip over all tile-related matters
 
    LDA PhaseCompleteFlag			;
    BNE CODE_C62C				;these can't be executed. probably a copy-paste mistake... or actually a branch mistake, but maybe it was intentional? there's one more winning state check further
@@ -1191,7 +1265,7 @@ CODE_C62C:
 CODE_C636:
    LDA $33					;check if we're processing Mario
    CMP #$02					;
-   BNE CODE_C63F				;if not, skip smth
+   BNE CODE_C63F				;only mario is allowed to collide with luigi
 
    JSR CODE_C0B6				;only run player<->player collision once and only for Mario 
 
@@ -1225,7 +1299,7 @@ CODE_C65D:
    RTS						;
 
 CODE_C66A:
-   LDA $43					;can update if this flag is set (are there any entities to speak of?
+   LDA EnemiesOnScreen				;can update if this flag is set (are there any entities to speak of?
    BNE CODE_C66F				;
    RTS						;
 
@@ -1244,9 +1318,9 @@ CODE_C66F:
    STA $A2					;
 
    LDA #$0D					;
-   STA $05FA					;skip over players and reflecting fireball for VRAM checks
+   STA Entity_VRAMPositionIndex			;skip over players and reflecting fireball for VRAM checks
 
-EntityProcessingLoop_C686:   
+EntityProcessingLoop_C686:
    JSR CODE_CB9B				;copy to current entity addresses (CurrentEntity_Address)
 
    LDA CurrentEntity_ActiveFlag			;entity active?
@@ -1254,7 +1328,7 @@ EntityProcessingLoop_C686:
 
    DEC $45					;-1 entity, period
    DEC $44					;
-   JSR CODE_DFBD				;ignore this non-existent entity's VRAM position
+   JSR SkipEntityVRAMPosition_DFBD		;ignore this non-existent entity's VRAM position
    JMP CODE_C75D				;next entity then
 
 CODE_C697:
@@ -1314,7 +1388,7 @@ CODE_C6CD:
 ;entity is kicked off
 CODE_C6E0:
    JSR CODE_DEAF				;handle getting kicked & splashing
-   JSR CODE_DFBD				;will check for the next entity's VRAM tile that is below them
+   JSR SkipEntityVRAMPosition_DFBD		;will check for the next entity's VRAM tile that is below them
    JMP CODE_C747				;draw and everything
 
 ;entity is normal
@@ -1726,7 +1800,25 @@ CODE_C8F4:
 
    LDA CurrentEntity_ID				;check for player
    AND #$0F					;
+.if Version <> PAL
    BNE CODE_C90A				;just update x
+.else
+   BEQ PAL_CODE_C919
+
+   LDA PAL_SpeedAlterationTimer			;player will be slightly slower to match PAL's lower refresh rate
+   BNE PAL_CODE_C927				;
+
+   LDA CurrentEntity_XSpeedTableEntry		;if player is moving only slightly
+   BEQ PAL_CODE_C927				;
+   DEY						;
+   CMP #$01					;if running...
+   BEQ PAL_CODE_C927				;will slow down
+
+   LDY #$01					;skidding, on the other hand, is FASTER. Every 4th frame that is.
+   BNE PAL_CODE_C927				;
+
+PAL_CODE_C919:
+.endif
 
    LDA CurrentEntity_TurningCounter		;is it turning?
    BNE CODE_C916				;doesnt move
@@ -1739,6 +1831,7 @@ CODE_C8F4:
 
    LDY CurrentEntity_XSpeedModifier		;slow down, or in rare cases, speed up (or don't do jack, depends on modifier's value)
 
+PAL_CODE_C927:
 CODE_C90A:
    TYA						;
    CLC						;
@@ -1968,27 +2061,27 @@ CODE_CA18:
 ;Sets up values that'll be used in screen filler routine
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-CODE_CA1B:
+ClearScreenAndAttributesInit_CA1B:
    LDA #$03					;
    JSR CODE_CA22				;
 
-CODE_CA20:
+ClearScreenInit_CA20:
    LDA #$01					;
 
 CODE_CA22:
    STA $01					;this is "VRAM" offset, needed to set-up proper tile update location
 
-   LDA #$24					;set blank tile to be displayed on screen
+   LDA #VRAMTile_Empty				;set blank tile to be displayed on screen
    STA $00					;
-   JMP CODE_CD43				;go and clear the screen
+   JMP ClearScreen_CD43				;go and clear the screen
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Clear Sprites loop
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;"Clears" OAM, by putting it in "Hide zone" (and setting other values we don't care about)
+;Remove sprite tiles (OAM tiles, sprites, whatever term you prefer) by putting it offscreen
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-CODE_CA2B:					;
+RemoveSpriteTiles_CA2B:
    LDY #>OAM_Y					;OAM starting point, high byte
    STY $01					;
 
@@ -1997,6 +2090,7 @@ CODE_CA2B:					;
 
    LDA #$F4					;
 
+;InitializeData_CA35:
 CODE_CA35:
    STA ($00),y					;\this piece of code is also called by other routine
    DEY						;|
@@ -2470,7 +2564,7 @@ CODE_CC54:
    LDA $00					;
 
 CODE_CC5F:
-   LDX $05FA					;
+   LDX Entity_VRAMPositionIndex			;
    STA CurrentEntity_Player_VRAMPosHi		;high byte
    STA Entity_VRAMPosition,X			;player's VRAM tile position
 
@@ -2480,7 +2574,7 @@ CODE_CC5F:
    STA Entity_VRAMPosition,X			;
 
    INX						;
-   STX $05FA					;
+   STX Entity_VRAMPositionIndex			;
 
 ;shared with normal entities
 CODE_CC73:
@@ -2507,8 +2601,7 @@ CODE_CC84:
    LDA $00					;
 
 CODE_CC8F:
-   LDX $05FA					;
-
+   LDX Entity_VRAMPositionIndex			;
    STA Entity_VRAMPosition,X			;
    INX						;
 
@@ -2516,7 +2609,7 @@ CODE_CC8F:
    STA Entity_VRAMPosition,X			;
 
    INX						;
-   STX $05FA					;index for all the other entities (maybe a second player even)
+   STX Entity_VRAMPositionIndex			;index for all the other entities (maybe a second player even)
    RTS						;
 
 ;update entity's pointer
@@ -2667,7 +2760,7 @@ CODE_CD42:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;straight up from Donkey Kong Jr.!
-CODE_CD43:
+ClearScreen_CD43:
    LDA HardwareStatus				;ready to draw
 
    LDA Reg2000BitStorage			;\
@@ -4058,7 +4151,7 @@ CODE_D3C6:
    STA Sound_Jingle				;
 
 CODE_D3EA:
-   JMP CODE_E13D				;enable display
+   JMP EnableRender_E13D			;enable display
 
 CODE_D3ED:
    LDA #Sound_Jingle_PhaseStart			;
@@ -4072,9 +4165,9 @@ CODE_D3F5:
    BNE CODE_D3EA				;and enable display
 
 CODE_D3F9:
-   JSR CODE_E132        			;call NMI and disable rendering    
-   JSR CODE_CA20				;clear screen
-   JSR CODE_CA2B				;remove all sprite tiles
+   JSR DisableRender_E132			;call NMI and disable rendering    
+   JSR ClearScreenInit_CA20			;clear screen
+   JSR RemoveSpriteTiles_CA2B			;remove all sprite tiles
    JSR CODE_D508				;draw main props (pipes, platforms and so on)
    JSR CODE_D61D				;show some initial strings
 
@@ -4082,9 +4175,9 @@ CODE_D3F9:
    RTS               				;
 
 CODE_D40B:
-   JSR CODE_E132 				;turn off rendering 
-   JSR CODE_CA20            			;clear screen
-   JSR CODE_CA2B				;clear OAM
+   JSR DisableRender_E132			;turn off rendering
+   JSR ClearScreenInit_CA20   			;clear screen
+   JSR RemoveSpriteTiles_CA2B			;clear OAM
 
    LDX #<DATA_F0A5				;draw title screen behind scenes
    LDY #>DATA_F0A5				;
@@ -4223,13 +4316,13 @@ CODE_D4AF:
    BNE CODE_D4CA				;keep on doing so
 
    LDX Demo_InputIndex_P1			;demo movement offset
-   LDA DATA_F823,X				;
+   LDA Player1DemoInputs_F823,X			;
    CMP #Demo_EndCommand				;if should end the demo
    BEQ CODE_D4F8				;end the demo (duh)
    STA Controller1InputPress			;store input
 
    INX						;
-   LDA DATA_F823,X				;
+   LDA Player1DemoInputs_F823,X			;
    STA Demo_InputTimer_P1			;and how long to hold the input
    INX						;
    STX Demo_InputIndex_P1			;
@@ -4275,8 +4368,7 @@ CODE_D4F8:
 
    INC NonGameplayMode				;
 
-;MuteSounds_D4FE:
-CODE_D4FE:
+MuteSounds_D4FE:
    LDA #$00					;store zero to all addresses
    LDX #$03					;loop through all sound addresses
 
@@ -6357,12 +6449,12 @@ CODE_DF37:
    RTS						;
 
 CODE_DF50:
-   LDA #$04					;
-   LDY CurrentEntity_ID				;state depending on which player
+   LDA #Player_State_P1OnRespawnPlatform	;
+   LDY CurrentEntity_ID				;on respawn platform state depending on which player
    DEY						;
    BEQ CODE_DF59				;
    
-   LDA #$08					;
+   LDA #Player_State_P2OnRespawnPlatform	;I don't know what the difference is between these two values other than... being different values.
 
 CODE_DF59:
    STA CurrentEntity_Player_State		;
@@ -6448,14 +6540,15 @@ GetRespawnPlatOAM_DFB0:
 CODE_DFB9:
    RTS						;
 
-;next player's vram position tile things
-CODE_DFBA:
-   JSR CODE_DFBD				;increase unknown address $05FA by 4
-   
-CODE_DFBD:
-   INC $05FA
-   INC $05FA
-   RTS
+;won't run player's tile check stuffs, skip over
+SkipPlayerVRAMPosition_DFBA:
+   JSR SkipEntityVRAMPosition_DFBD		;run twice (because player checks for two positions - top for bumping, and bottom for grounding itself (like pretty much everything else)
+
+;won't run entity's tile check stuffs, skip over
+SkipEntityVRAMPosition_DFBD:
+   INC Entity_VRAMPositionIndex			;
+   INC Entity_VRAMPositionIndex			;
+   RTS						;
 
 ;this routine is used to remove sprite tiles for current entity
 ;Input Y - amount of tiles to remove
@@ -6716,7 +6809,7 @@ CODE_E129:
 CODE_E131:
    RTS						;
 
-CODE_E132:
+DisableRender_E132:
    JSR WaitForNMI_D5DC				;wait for NMI
 
    LDA Reg2001BitStorage			;\
@@ -6724,7 +6817,7 @@ CODE_E132:
    STA RenderBits				;/
    RTS						;
 
-CODE_E13D:
+EnableRender_E13D:
    JSR WaitForNMI_D5DC				;wait for NMI
 
    LDA Reg2001BitStorage			;\
@@ -6963,7 +7056,7 @@ CODE_E26D:
    LDA #$00					;
    STA TitleScreen_DemoCount			;play title screen song when back at the title screen
 
-   JSR CODE_D4FE				;no sounds
+   JSR MuteSounds_D4FE				;no sounds
 
    LDA #Sound_Jingle_GameOver			;game over!
    STA Sound_Jingle				;
@@ -6974,7 +7067,7 @@ CODE_E26D:
    LDA #$0B					;game over state
    STA GameplayMode				;
 
-   JMP CODE_CA2B				;remove all sprite tiles
+   JMP RemoveSpriteTiles_CA2B			;remove all sprite tiles
 
 ;Game Over Mode
 CODE_E28B:
@@ -7156,7 +7249,11 @@ CODE_E36C:
    DEC BonusTimeMilliSecs			;-1 millisecond
 
 CODE_E374:
-   LDA #$06					;
+.if Version = PAL
+   LDA #BonusTimerMilliSecondTiming-1		;WOW! Milliseconds go by faster in PAL version! Who woulda guessed? Well... maybe not me.
+.else
+   LDA #BonusTimerMilliSecondTiming		;
+.endif
    STA BonusTimeMilliSecs_Timing		;
 
    LDA #$14					;draw 1 row with 4 tiles
@@ -7328,19 +7425,19 @@ DATA_E45C:
 .word CODE_E4AA					;bonus/no bonus
 
 CODE_E464:
-   JSR CODE_E132				;turn off rendering & wait for NMI to occur
-   JSR CODE_CA20				;clear screen
+   JSR DisableRender_E132			;turn off rendering & wait for NMI to occur
+   JSR ClearScreenInit_CA20			;clear screen
    JSR CODE_CA3B				;VRAM attributes and maybe something else  
-   JSR CODE_CA2B				;clear OAM
+   JSR RemoveSpriteTiles_CA2B			;clear OAM
    JSR CODE_D5BE				;draw some HUD elements
    JSR InitLives_D60F				;prepare OAM slots for lives
    JSR CODE_D5E6				;set Mario's lives Y-position
    JSR CODE_D5EC				;same for Luigi
-   JSR CODE_E13D				;wait for NMI and enable rendering
+   JSR EnableRender_E13D			;wait for NMI and enable rendering
 
    LDA #$00					;zero out RAM addresses for next state
-   STA $04BA					;some other pointer
-   STA $2B					;timer
+   STA TESTYOURSKILL_CoinCountSubPointer	;coin count state subpointer
+   STA GeneralTimer2B				;timer
 
    INC TESTYOURSKILL_CoinCountPointer		;to the next state
 
@@ -7348,7 +7445,7 @@ CODE_E489:
    RTS						;
 
 CODE_E48A:
-   LDA $2B					;wait for timer
+   LDA GeneralTimer2B				;wait for timer
    BNE CODE_E489				;
 
    LDA TESTYOURSKILL_CoinCountSubPointer	;execute Mario's pointers
@@ -7363,7 +7460,7 @@ CODE_E49A:
    LDA GeneralTimer2B				;wait for a bit...
    BNE CODE_E489				;
 
-   LDA $04BA					;
+   LDA TESTYOURSKILL_CoinCountSubPointer	;
    JSR ExecutePointers_CD9E			;
 
 DATA_E4A4:
@@ -8147,7 +8244,16 @@ CODE_E905:
    LDA #$00					;
 
 CODE_E907:
+   DEC Entity_WavyFireball_XPos			;
+
+.if Version = PAL
+   LDX PAL_SpeedAlterationTimer			;will move an extra pixel every 4th frame
+   BNE PAL_CODE_E92E				;
+
    DEC Entity_WavyFireball_XPos			;move left
+
+PAL_CODE_E92E:
+.endif
 
 CODE_E90A:
    CLC						;
@@ -8195,6 +8301,13 @@ CODE_E94B:
    LDA #$00					;
 
 CODE_E94D:
+.if Version = PAL
+   INC Entity_WavyFireball_XPos			;
+
+   LDX PAL_SpeedAlterationTimer			;will move an extra pixel every 4th frame
+   BNE PAL_CODE_E92E				;
+.endif
+
    INC Entity_WavyFireball_XPos			;
    BNE CODE_E90A				;
 
@@ -8645,12 +8758,27 @@ CODE_EBBC:
    LDA Entity_ReflectingFireball_HorzDirection	;check direction with which the fireball is moving (left or right)
    BNE CODE_EBC9				;
 
+.if Version = PAL
+   INC Entity_ReflectingFireball_XPos		;
+
+   LDA PAL_SpeedAlterationTimer			;I hope you already got the idea. Yes, extra pixel every fourth frame
+   BNE PAL_CODE_EC05				;
+.endif
+
    INC Entity_ReflectingFireball_XPos		;move right
    BNE CODE_EBCC				;
 
 CODE_EBC9:
+.if Version = PAL
+   DEC Entity_ReflectingFireball_XPos		;
+
+   LDA PAL_SpeedAlterationTimer			;The wonders of PAL conversions. Did you know that the European version of Duck Tales for the NES made Scrooge faster to compensate for slower frame rate?
+   BNE PAL_CODE_EC05				;
+.endif
+
    DEC Entity_ReflectingFireball_XPos		;move left
 
+PAL_CODE_EC05:
 CODE_EBCC:
    LDX Entity_ReflectingFireball_AnimationPointer
    LDA EntityMovementAnimations_F4B2,X		;fairly standard animation routine
@@ -8875,7 +9003,7 @@ CODE_ECEC:
 CODE_ECF2:
    JMP CODE_C6BF				;jump back and continue processing this entity
 
-   JSR CODE_DFBD      				;these lines are never executed. RIP (supposed to move onto a new entity)
+   JSR SkipEntityVRAMPosition_DFBD		;these lines are never executed. RIP (supposed to move onto a new entity)
    JMP CODE_C75A				;
 
 ;Freezie
@@ -9347,7 +9475,7 @@ DATA_EF97:
 ;reflecting fireball appearing effect animation table
 ;$00 - keep the same frame as before, used to prolong the frame of animation
 ;$FF - terminator, as you'd expect
-;ReflectingFireball_AppearingAnimFrames_EF9D
+;ReflectingFireball_AppearingAnimFrames_EF9D:
 DATA_EF9D:
 .byte GFX_Fireball_Pop2,$00
 .byte GFX_Fireball_Pop3,$00
@@ -9487,14 +9615,24 @@ SpawnInitValues_WavyFireball_F061:
 .byte $04,$04					;CurrentEntity_HitBoxHeight/CurrentEntity_HitBoxWidth
 
 DATA_F081:
-.byte $28,$1E,$0A,$05,$0F,$0A,$07,$03
+.if Version <> PAL
+  .byte $28,$1E,$0A,$05,$0F,$0A,$07,$03		;NTSC
+.else
+  .byte $21,$19,$08,$04,$0D,$08,$06,$03		;PAL
+.endif
 
 ;timer values for how long it should take for a reflecting fireball to appear
 ;progressively less and less time to spawn a fireball
 DATA_F089:
-.byte $32,$32,$28,$26,$1E,$1E,$1C,$12
-.byte $28,$28,$1C,$12,$1C,$1C,$12,$0A
-.byte $1E,$14,$14,$12,$14,$12,$0A,$08
+.if Version <> PAL
+  .byte $32,$32,$28,$26,$1E,$1E,$1C,$12		;NTSC
+  .byte $28,$28,$1C,$12,$1C,$1C,$12,$0A
+  .byte $1E,$14,$14,$12,$14,$12,$0A,$08
+.else
+  .byte $28,$28,$21,$1F,$19,$19,$17,$0F		;PAL
+  .byte $21,$21,$17,$0F,$17,$17,$0F,$08
+  .byte $19,$10,$10,$0F,$10,$0F,$08,$06
+.endif
 
 ;y-positions for wavy fireball's spawn points, based on which platform level the player was on at the moment of its spawn
 WavyFireball_SpawnYPos_F0A1:
@@ -9884,63 +10022,117 @@ SpawnInitValues_Players_F2EC:
 .byte $00					;CurrentEntity_TileAtBottomVRAMPos
 .byte $04,$04					;CurrentEntity_HitBoxHeight/CurrentEntity_HitBoxWidth
 
+;Speed values are altered for PAL version
+
 ;gravity y-speeds for fighterflies (stall in air for a bit, then applies general gravity that comes right after)
 DATA_F32C:
 .byte $00,$00,$00,$00,$00,$00,$00,$00
 .byte $00,$00,$00,$00,$00,$00
 
-;gravity y-speeds for entities
+;gravity y-speeds for entities (differs between PAL and NTSC versions)
 DATA_F33A:
-.byte $01,$00,$01,$00,$01,$01,$00,$01
-.byte $01,$02,$01,$02,$02,$02,$02,$02
-.byte $02,$03,$03,$03,$03
+.if Version <> PAL
+  .byte $01,$00,$01,$00,$01,$01,$00,$01		;NTSC gravity
+  .byte $01,$02,$01,$02,$02,$02,$02,$02
+  .byte $02,$03,$03,$03,$03
+.else
+  .byte $01,$00,$01,$01,$01,$02,$01,$02		;PAL gravity (faster)
+  .byte $02,$02,$02,$03,$03,$03,$03,$03
+  .byte $03
+.endif
+
 .byte $AA
 
 ;Vertical jump/bounce y-speeds for Mario & Luigi (when jumping or bouncing off another player)
 DATA_F350:
-.byte $FC,$FC,$FC,$FC,$FC,$FC,$FC,$FD
-.byte $FD,$FE,$FE,$FE,$FE,$FE,$FE,$FF
-.byte $FE,$FF,$FF,$FF,$00,$FF,$FF,$00
-.byte $FF,$00,$00,$00
+.if Version <> PAL
+  .byte $FC,$FC,$FC,$FC,$FC,$FC,$FC,$FD		;NTSC
+  .byte $FD,$FE,$FE,$FE,$FE,$FE,$FE,$FF
+  .byte $FE,$FF,$FF,$FF,$00,$FF,$FF,$00
+  .byte $FF,$00,$00,$00
+.else
+  .byte $FC,$FC,$FC,$FC,$FC,$FC,$FC,$FC		;PAL
+  .byte $FD,$FD,$FE,$FE,$FE,$FE,$FE,$FE
+  .byte $FE,$FF,$FF,$FF,$00,$FF,$00
+.endif
+
 .byte $AA
 
 ;Vertical jump y-speeds for the Fighterfly when not on the bottom platform
 DATA_F36D:
-.byte $FE,$FE,$FE
+.if Version <> PAL
+  .byte $FE,$FE,$FE
+.else
+  .byte $FD,$FE,$FE
+.endif
 
 ;vertical jump y-speeds for the Fighterfly, general
 DATA_F370:
-.byte $FF,$FF,$FF,$FF,$FF,$00,$FF,$00
-.byte $FF,$00
+.if Version <> PAL
+  .byte $FF,$FF,$FF,$FF,$FF,$00,$FF,$00		;NTSC
+  .byte $FF,$00
+.else
+  .byte $FE,$FE,$FF,$FF,$FF,$00,$FF		;PAL
+.endif
+
 .byte $AA
 
+;Sidestepper's something
 DATA_F37B:
-.byte $00,$01,$00,$01,$00,$01,$01,$01
-.byte $02,$01,$01,$02,$03,$03,$04,$04
-.byte $CC,$04,$CC,$CC,$CC,$04,$CC
+.if Version <> PAL
+  .byte $00,$01,$00,$01,$00,$01,$01,$01		;NTSC
+  .byte $02,$01,$01,$02,$03,$03,$04,$04
+  .byte $CC,$04,$CC,$CC,$CC,$04,$CC
+.else
+  .byte $00,$01,$01,$01,$01,$01,$02,$02		;PAL (I don't think I need to tell you that fact from now on, just know that values after .if - NTSC, after .else - PAL)
+  .byte $02,$02,$03,$03,$04,$04,$CC,$04
+  .byte $CC,$CC,$CC,$04,$CC
+.endif
+
 .byte $AA
 
 ;x-speed, movement timing (every x frames), speed modifier (typically used to make the entity stop at certain times so it looks like it moves slowly)
 EntityXMovementData_F393:
 PlayerXMovementData:
-.byte $01,$03,$00
-.byte $01,$02,$00
-.byte $01,$01,$00
+.if Version <> PAL
+  .byte $01,$03,$00
+  .byte $01,$02,$00
+  .byte $01,$01,$00
+.else
+  .byte $01,$02,$00
+  .byte $01,$01,$00
+  .byte $01,$01,$00
+.endif
 .byte $AA
 
 ShellcreeperXMovementData:
-.byte $01,$03,$00
-.byte $01,$02,$00
-.byte $01,$01,$FF
+.if Version <> PAL
+  .byte $01,$03,$00
+  .byte $01,$02,$00
+  .byte $01,$01,$FF
+.else
+  .byte $01,$02,$00
+  .byte $01,$01,$FF
+  .byte $01,$01,$00
+.endif
 .byte $AA
 
 SidestepperXMovementData:
-.byte $01,$02,$00
-.byte $01,$01,$FF
-.byte $01,$01,$FF
-.byte $01,$01,$00
-.byte $01,$01,$00
-.byte $01,$01,$01			;third byte = actutally speed up instead of slowing down every now and then
+.if Version <> PAL
+  .byte $01,$02,$00
+  .byte $01,$01,$FF
+  .byte $01,$01,$FF
+  .byte $01,$01,$00
+  .byte $01,$01,$00
+  .byte $01,$01,$01			;third byte = actutally speed up instead of slowing down every now and then
+.else
+  .byte $01,$01,$FF
+  .byte $01,$01,$00
+  .byte $01,$01,$00
+  .byte $01,$01,$01
+  .byte $01,$01,$01
+  .byte $02,$01,$FF
+.endif
 .byte $AA
 
 ;This set of data is enemy data to spawn from pipes per "Enemy level".
@@ -9966,108 +10158,202 @@ DATA_F3BA:
 
 ;3 shellkreepers
 DATA_F3D2:
-.byte $05,$00
-.byte $12,$00
-.byte $1F,$00
+.if Version <> PAL
+  .byte $05,$00
+  .byte $12,$00
+  .byte $1F,$00
+.else
+  .byte $04,$00				;yes, spawning times are also different in PAL version
+  .byte $0E,$00
+  .byte $19,$00
+.endif
 .byte $AA
 
 ;5 shellkreepers
 DATA_F3D9:
-.byte $05,$00
-.byte $12,$00
-.byte $1F,$00
-.byte $19,$00
-.byte $1F,$00
+.if Version <> PAL
+  .byte $05,$00
+  .byte $12,$00
+  .byte $1F,$00
+  .byte $19,$00
+  .byte $1F,$00
+.else
+  .byte $04,$00
+  .byte $0E,$00
+  .byte $19,$00
+  .byte $14,$00
+  .byte $19,$00
+.endif
 .byte $AA
 
 ;4 sidesteppers
 DATA_F3E4:
-.byte $05,$01
-.byte $0C,$01
-.byte $2B,$01
-.byte $0C,$01
+.if Version <> PAL
+  .byte $05,$01
+  .byte $0C,$01
+  .byte $2B,$01
+  .byte $0C,$01
+.else
+  .byte $04,$01
+  .byte $0A,$01
+  .byte $24,$01
+  .byte $0A,$01
+.endif
 .byte $AA
 
 ;4 sidesteppers and 2 shellkreepers
 DATA_F3ED:
-.byte $03,$01
-.byte $0C,$01
-.byte $31,$00
-.byte $06,$00
-.byte $49,$01
-.byte $07,$01
+.if Version <> PAL
+  .byte $03,$01
+  .byte $0C,$01
+  .byte $31,$00
+  .byte $06,$00
+  .byte $49,$01
+  .byte $07,$01
+.else
+  .byte $03,$01
+  .byte $0A,$01
+  .byte $28,$00
+  .byte $05,$00
+  .byte $3C,$01
+  .byte $06,$01
+.endif
 .byte $AA
 
 ;4 fighterflies
 DATA_F3FA:
-.byte $0C,$02
-.byte $0C,$02
-.byte $31,$02
-.byte $0C,$02
+.if Version <> PAL
+  .byte $0C,$02
+  .byte $0C,$02
+  .byte $31,$02
+  .byte $0C,$02
+.else
+  .byte $0A,$02
+  .byte $0A,$02
+  .byte $28,$02
+  .byte $0A,$02
+.endif
 .byte $AA
 
 ;3 fighterflies and 2 sidesteppers
 DATA_F403:
-.byte $0C,$02
-.byte $0C,$02
-.byte $31,$01
-.byte $06,$01
-.byte $31,$02
+.if Version <> PAL
+  .byte $0C,$02
+  .byte $0C,$02
+  .byte $31,$01
+  .byte $06,$01
+  .byte $31,$02
+.else
+  .byte $0A,$02
+  .byte $0A,$02
+  .byte $28,$01
+  .byte $05,$01
+  .byte $28,$02
+.endif
 .byte $AA
 
 ;4 shellkreepers, 1 fighterfly
 DATA_F40E:
-.byte $03,$00
-.byte $0C,$00
-.byte $31,$02
-.byte $06,$00
-.byte $31,$00
+.if Version <> PAL
+  .byte $03,$00
+  .byte $0C,$00
+  .byte $31,$02
+  .byte $06,$00
+  .byte $31,$00
+.else
+  .byte $03,$00
+  .byte $0A,$00
+  .byte $28,$02
+  .byte $05,$00
+  .byte $28,$00
+.endif
 .byte $AA
 
 ;4 sidesteppers, 1 fighterfly
 DATA_F419:
-.byte $03,$01
-.byte $0C,$01
-.byte $31,$02
-.byte $06,$01
-.byte $31,$01
+.if Version <> PAL
+  .byte $03,$01
+  .byte $0C,$01
+  .byte $31,$02
+  .byte $06,$01
+  .byte $31,$01
+.else
+  .byte $03,$01
+  .byte $0A,$01
+  .byte $28,$02
+  .byte $05,$01
+  .byte $28,$01
+.endif
 .byte $AA
 
 ;4 sidesteppers, 2 fighterflies
 DATA_F424:
-.byte $0C,$02
-.byte $0C,$01
-.byte $31,$01
-.byte $06,$01
-.byte $31,$02
-.byte $12,$01
+.if Version <> PAL
+  .byte $0C,$02
+  .byte $0C,$01
+  .byte $31,$01
+  .byte $06,$01
+  .byte $31,$02
+  .byte $12,$01
+.else
+  .byte $0A,$02
+  .byte $0A,$01
+  .byte $28,$01
+  .byte $05,$01
+  .byte $28,$02
+  .byte $0E,$01
+.endif
 .byte $AA
 
 ;4 sidesteppers, 2 fighterflies, different order
 DATA_F431:
-.byte $03,$01
-.byte $0C,$01
-.byte $31,$01
-.byte $06,$02
-.byte $31,$02
-.byte $12,$01
+.if Version <> PAL
+  .byte $03,$01
+  .byte $0C,$01
+  .byte $31,$01
+  .byte $06,$02
+  .byte $31,$02
+  .byte $12,$01
+.else
+  .byte $03,$01
+  .byte $0A,$01
+  .byte $28,$01
+  .byte $05,$02
+  .byte $28,$02
+  .byte $0E,$01
+.endif
 .byte $AA
 
 ;4 shellkreepers, 1 sidestepper
 DATA_F43E:
-.byte $03,$00
-.byte $0C,$00
-.byte $31,$01
-.byte $06,$00
-.byte $06,$00
+.if Version <> PAL
+  .byte $03,$00
+  .byte $0C,$00
+  .byte $31,$01
+  .byte $06,$00
+  .byte $06,$00
+.else
+  .byte $03,$00
+  .byte $0A,$00
+  .byte $28,$01
+  .byte $05,$00
+  .byte $05,$00
+.endif
 .byte $AA
 
 ;4 shellkreepers, different timings
 DATA_F449:
-.byte $01,$00
-.byte $05,$00
-.byte $40,$00
-.byte $FF,$00
+.if Version <> PAL
+  .byte $01,$00
+  .byte $05,$00
+  .byte $40,$00
+  .byte $FF,$00
+.else
+  .byte $01,$00
+  .byte $05,$00
+  .byte $31,$00
+  .byte $FF,$00
+.endif
 .byte $AA
 
 ;initial values for entities when spawned, specifically, shellcreeper, sidestepper and fighterfly
@@ -10423,76 +10709,146 @@ DATA_F5A4:
 
 ;bounce y-speed for shellcreeper and sidestepper (flows into the table right after)
 DATA_F5AA:
-.byte $FD,$FE,$FE
+.if Version <> PAL
+  .byte $FD,$FE,$FE
+.else
+  .byte $FD,$FD,$FE
+.endif
 
 ;bounce y-speed after getting bumped by the player (continuation for shellcreeper/sidestepper, and beginning for players)
 DATA_F5AD:
-.byte $FE,$FE,$FF,$FF,$FF,$FE,$00,$FF
-.byte $00,$FE,$00,$FF,$00,$00,$00
+.if Version <> PAL
+  .byte $FE,$FE,$FF,$FF,$FF,$FE,$00,$FF
+  .byte $00,$FE,$00,$FF,$00,$00,$00
+.else
+  .byte $FE,$FE,$FE,$FF,$FF,$00,$FF,$00
+  .byte $FF,$00,$00
+.endif
 .byte $99					;stop
 
 DATA_F5BD:
-.byte $FE,$FE,$FE,$FF,$FF,$FF,$00,$FF
-.byte $00,$FF,$00,$00
+.if Version <> PAL
+  .byte $FE,$FE,$FE,$FF,$FF,$FF,$00,$FF
+  .byte $00,$FF,$00,$00
+.else
+  .byte $FD,$FE,$FE,$FF,$FF,$FF,$00,$FF
+  .byte $00
+.endif
 .byte $99
 
 ;flipped animation table for shellcreeper, first byte is graphic frame and the second is how long it lasts
 ;$00 - cycle palette (to indicate that it's going to move faster)
 DATA_F5CA:
-.byte GFX_Shellcreeper_Flipped1,$40
-.byte GFX_Shellcreeper_Flipped2,$40
-.byte GFX_Shellcreeper_Flipped1,$40
-.byte GFX_Shellcreeper_Flipped2,$30
-.byte GFX_Shellcreeper_Flipped1,$30
-.byte GFX_Shellcreeper_Flipped2,$20
-.byte GFX_Shellcreeper_Flipped1,$20
-.byte GFX_Shellcreeper_Flipped2,$20
-.byte GFX_Shellcreeper_Flipped1,$20
-.byte GFX_Shellcreeper_Flipped2,$18
-.byte GFX_Shellcreeper_Flipped1,$10
-.byte $00
-.byte GFX_Shellcreeper_Flipped2,$10
-.byte GFX_Shellcreeper_Flipped1,$10
-.byte GFX_Shellcreeper_Flipped2,$08
-.byte GFX_Shellcreeper_Flipped1,$08
+.if Version <> PAL
+  .byte GFX_Shellcreeper_Flipped1,$40		;un-flipping animation timings are different between regions
+  .byte GFX_Shellcreeper_Flipped2,$40
+  .byte GFX_Shellcreeper_Flipped1,$40
+  .byte GFX_Shellcreeper_Flipped2,$30
+  .byte GFX_Shellcreeper_Flipped1,$30
+  .byte GFX_Shellcreeper_Flipped2,$20
+  .byte GFX_Shellcreeper_Flipped1,$20
+  .byte GFX_Shellcreeper_Flipped2,$20
+  .byte GFX_Shellcreeper_Flipped1,$20
+  .byte GFX_Shellcreeper_Flipped2,$18
+  .byte GFX_Shellcreeper_Flipped1,$10
+  .byte $00
+  .byte GFX_Shellcreeper_Flipped2,$10
+  .byte GFX_Shellcreeper_Flipped1,$10
+  .byte GFX_Shellcreeper_Flipped2,$08
+  .byte GFX_Shellcreeper_Flipped1,$08
+.else
+  .byte GFX_Shellcreeper_Flipped1,$35
+  .byte GFX_Shellcreeper_Flipped2,$35
+  .byte GFX_Shellcreeper_Flipped1,$35
+  .byte GFX_Shellcreeper_Flipped2,$28
+  .byte GFX_Shellcreeper_Flipped1,$28
+  .byte GFX_Shellcreeper_Flipped2,$1A
+  .byte GFX_Shellcreeper_Flipped1,$1A
+  .byte GFX_Shellcreeper_Flipped2,$1A
+  .byte GFX_Shellcreeper_Flipped1,$1A
+  .byte GFX_Shellcreeper_Flipped2,$14
+  .byte GFX_Shellcreeper_Flipped1,$0D
+  .byte $00
+  .byte GFX_Shellcreeper_Flipped2,$0E
+  .byte GFX_Shellcreeper_Flipped1,$0E
+  .byte GFX_Shellcreeper_Flipped2,$08
+  .byte GFX_Shellcreeper_Flipped1,$08
+.endif
 .byte $FF
+
 
 ;flipped animation table for sidestepper
 DATA_F5EA:
-.byte GFX_Sidestepper_Flipped1,$40
-.byte GFX_Sidestepper_Flipped2,$40
-.byte GFX_Sidestepper_Flipped1,$40
-.byte GFX_Sidestepper_Flipped2,$30
-.byte GFX_Sidestepper_Flipped1,$30
-.byte GFX_Sidestepper_Flipped2,$20
-.byte GFX_Sidestepper_Flipped1,$20
-.byte GFX_Sidestepper_Flipped2,$20
-.byte GFX_Sidestepper_Flipped1,$18
-.byte GFX_Sidestepper_Flipped2,$10
-.byte $00
-.byte GFX_Sidestepper_Flipped1,$10
-.byte GFX_Sidestepper_Flipped2,$08
-.byte GFX_Sidestepper_Flipped1,$08
-.byte GFX_Sidestepper_Flipped2,$08
+.if Version <> PAL
+  .byte GFX_Sidestepper_Flipped1,$40
+  .byte GFX_Sidestepper_Flipped2,$40
+  .byte GFX_Sidestepper_Flipped1,$40
+  .byte GFX_Sidestepper_Flipped2,$30
+  .byte GFX_Sidestepper_Flipped1,$30
+  .byte GFX_Sidestepper_Flipped2,$20
+  .byte GFX_Sidestepper_Flipped1,$20
+  .byte GFX_Sidestepper_Flipped2,$20
+  .byte GFX_Sidestepper_Flipped1,$18
+  .byte GFX_Sidestepper_Flipped2,$10
+  .byte $00
+  .byte GFX_Sidestepper_Flipped1,$10
+  .byte GFX_Sidestepper_Flipped2,$08
+  .byte GFX_Sidestepper_Flipped1,$08
+  .byte GFX_Sidestepper_Flipped2,$08
+.else
+  .byte GFX_Sidestepper_Flipped1,$35
+  .byte GFX_Sidestepper_Flipped2,$35
+  .byte GFX_Sidestepper_Flipped1,$35
+  .byte GFX_Sidestepper_Flipped2,$28
+  .byte GFX_Sidestepper_Flipped1,$28
+  .byte GFX_Sidestepper_Flipped2,$1A
+  .byte GFX_Sidestepper_Flipped1,$1A
+  .byte GFX_Sidestepper_Flipped2,$1A
+  .byte GFX_Sidestepper_Flipped1,$14
+  .byte GFX_Sidestepper_Flipped2,$0D
+  .byte $00
+  .byte GFX_Sidestepper_Flipped1,$0E
+  .byte GFX_Sidestepper_Flipped2,$08
+  .byte GFX_Sidestepper_Flipped1,$08
+  .byte GFX_Sidestepper_Flipped2,$08
+.endif
 .byte $FF
 
 ;flipped animation table for fighterfly
 DATA_F608:
-.byte GFX_Fighterfly_Flipped1,$60
-.byte GFX_Fighterfly_Flipped2,$40
-.byte GFX_Fighterfly_Flipped1,$30
-.byte GFX_Fighterfly_Flipped2,$20
-.byte GFX_Fighterfly_Flipped1,$20
-.byte GFX_Fighterfly_Flipped2,$18
-.byte GFX_Fighterfly_Flipped1,$18
-.byte GFX_Fighterfly_Flipped2,$10
-.byte GFX_Fighterfly_Flipped1,$10
-.byte $00
-.byte GFX_Fighterfly_Flipped2,$08
-.byte GFX_Fighterfly_Flipped1,$08
-.byte GFX_Fighterfly_Flipped2,$08
-.byte GFX_Fighterfly_Flipped1,$08
-.byte GFX_Fighterfly_Flipped2,$04
+.if Version <> PAL
+  .byte GFX_Fighterfly_Flipped1,$60
+  .byte GFX_Fighterfly_Flipped2,$40
+  .byte GFX_Fighterfly_Flipped1,$30
+  .byte GFX_Fighterfly_Flipped2,$20
+  .byte GFX_Fighterfly_Flipped1,$20
+  .byte GFX_Fighterfly_Flipped2,$18
+  .byte GFX_Fighterfly_Flipped1,$18
+  .byte GFX_Fighterfly_Flipped2,$10
+  .byte GFX_Fighterfly_Flipped1,$10
+  .byte $00
+  .byte GFX_Fighterfly_Flipped2,$08
+  .byte GFX_Fighterfly_Flipped1,$08
+  .byte GFX_Fighterfly_Flipped2,$08
+  .byte GFX_Fighterfly_Flipped1,$08
+  .byte GFX_Fighterfly_Flipped2,$04
+.else
+  .byte GFX_Fighterfly_Flipped1,$50
+  .byte GFX_Fighterfly_Flipped2,$35
+  .byte GFX_Fighterfly_Flipped1,$28
+  .byte GFX_Fighterfly_Flipped2,$1A
+  .byte GFX_Fighterfly_Flipped1,$1A
+  .byte GFX_Fighterfly_Flipped2,$14
+  .byte GFX_Fighterfly_Flipped1,$14
+  .byte GFX_Fighterfly_Flipped2,$0E
+  .byte GFX_Fighterfly_Flipped1,$0E
+  .byte $00
+  .byte GFX_Fighterfly_Flipped2,$08
+  .byte GFX_Fighterfly_Flipped1,$08
+  .byte GFX_Fighterfly_Flipped2,$08
+  .byte GFX_Fighterfly_Flipped1,$08
+  .byte GFX_Fighterfly_Flipped2,$04
+.endif
 .byte $FF
 
 ;turning animation for shellcreeper. $01 - flip the image, $FF - end turning
@@ -10536,6 +10892,7 @@ DATA_F643:
 DATA_F64C:
 .byte $AA
 
+;gravity after coming out of pipe?
 DATA_F64D:
 .byte $F7,$F8,$FA,$FB,$FC,$FD,$FE,$FE
 .byte $FE,$FE,$FE,$FF,$FF,$00,$FF,$00
@@ -10865,75 +11222,112 @@ DATA_F81C:
 .byte $00,$01,$02,$02,$01,$00,$AA
 
 ;this table contains movement for Mario for demo mode. consists of pairs that are input and time for said input to be held.
-DATA_F823:
-.byte $00,$5C
-.byte Input_Right,$50
-.byte $00,$10
-.byte Input_Left,$14
-.byte Input_Left|Input_A,$40
-.byte $00,$10
-.byte Input_Right,$28
-.byte $00,$50
-.byte Input_A,$40
-.byte Input_Left,$28
-.byte $00,$14
-.byte Input_Right,$10
-.byte Input_Right|Input_A,$40
-.byte $00,$48
-.byte Input_Right,$30
-.byte Input_Right|Input_A,$30
-.byte Input_Right,$10
-.byte $00,$10
-.byte Input_Left,$45
-.byte Input_Left|Input_A,$40
-.byte Input_Left,$20
-.byte $00,$08
-.byte Input_Right,$40
-.byte Input_Right|Input_A,$40
+Player1DemoInputs_F823:
+.if Version <> PAL
+  .byte $00,$5C
+  .byte Input_Right,$50
+  .byte $00,$10
+  .byte Input_Left,$14
+  .byte Input_Left|Input_A,$40
+  .byte $00,$10
+  .byte Input_Right,$28
+  .byte $00,$50
+  .byte Input_A,$40
+  .byte Input_Left,$28
+  .byte $00,$14
+  .byte Input_Right,$10
+  .byte Input_Right|Input_A,$40
+  .byte $00,$48
+  .byte Input_Right,$30
+  .byte Input_Right|Input_A,$30
+  .byte Input_Right,$10
+  .byte $00,$10
+  .byte Input_Left,$45
+  .byte Input_Left|Input_A,$40
+  .byte Input_Left,$20
+  .byte $00,$08
+  .byte Input_Right,$40
+  .byte Input_Right|Input_A,$40
+.else
+  .byte $00,$70					;the demo movie plays a bit differently compared to an NTSC version (the inputs are different + all the timing and speed differences from before)
+  .byte Input_Right,$38
+  .byte $00,$10
+  .byte Input_Left,$18
+  .byte Input_Left|Input_A,$01
+  .byte Input_Right,$38
+  .byte Input_A,$60
+  .byte Input_A,$48
+  .byte Input_Left,$0E
+  .byte Input_Left|Input_A,$40
+  .byte $00,$10
+  .byte Input_Right,$10
+  .byte Input_Right|Input_A,$58
+  .byte $00,$40
+  .byte Input_A,$30
+  .byte Input_A,$20
+  .byte Input_Right,$20
+  .byte Input_Left,$88
+  .byte Input_Right,$20
+  .byte Input_A,$40
+  .byte Input_Left,$60
+  .byte Input_Left|Input_A,$30
+  .byte Input_Right,$50
+  .byte Input_Right|Input_A,$80
+.endif
+
 .byte Demo_EndCommand
 
 ;same as above but for Luigi.
 DATA_F854:
-.byte $00,$30
-.byte Input_Left,$50
-.byte $00,$10
-.byte Input_Right,$18
-.byte Input_Right|Input_A,$30
-.byte Input_Right|Input_A,$18
-.byte $00,$10
-.byte Input_Left,$24
-.byte Input_Left|Input_A,$60
-.byte Input_Left|Input_A,$40
-.byte $00,$08
-.byte Input_Right,$24
-.byte Input_Right|Input_A,$40
-.byte $00,$18
-.byte Input_Left,$10
-.byte Input_Left|Input_A,$40
-.byte $00,$40
-.byte Input_Right,$60
-.byte $00,$50
-.byte Input_Right,$FF    
+.if Version <> PAL
+  .byte $00,$30
+  .byte Input_Left,$50
+  .byte $00,$10
+  .byte Input_Right,$18
+  .byte Input_Right|Input_A,$30
+  .byte Input_Right|Input_A,$18
+  .byte $00,$10
+  .byte Input_Left,$24
+  .byte Input_Left|Input_A,$60
+  .byte Input_Left|Input_A,$40
+  .byte $00,$08
+  .byte Input_Right,$24
+  .byte Input_Right|Input_A,$40
+  .byte $00,$18
+  .byte Input_Left,$10
+  .byte Input_Left|Input_A,$40
+  .byte $00,$40
+  .byte Input_Right,$60
+  .byte $00,$50
+  .byte Input_Right,$FF
+.else
+  .byte $00,$A0					;Luigi's demo inputs also get hit by PAL-region stick
+  .byte Input_Left,$38
+  .byte Input_Right,$20
+  .byte Input_Right|Input_A,$40
+  .byte $00,$20
+  .byte Input_Left,$10
+  .byte Input_Left|Input_A,$39
+  .byte Input_Left|Input_A,$20
+  .byte $00,$30
+  .byte Input_Left,$08
+  .byte Input_Left|Input_A,$40
+  .byte Input_A,$90
+  .byte Input_Left,$20
+  .byte Input_Right,$30
+  .byte Input_Right|Input_A,$50
+  .byte $00,$50
+  .byte Input_Right,$B8
+  .byte Input_Right|Input_A,$80
+  .byte $00,$50
+  .byte Input_Right,$FF
+.endif
 
-;Freespace! European version leaves only a few bytes of it (7 to be exact).
-.byte $FF,$FF,$FF
-.byte $FF,$FF,$FF
-.byte $FF,$FF,$FF         
-.byte $FF,$FF,$FF        
-.byte $FF,$FF,$FF         
-.byte $FF,$FF,$FF         
-.byte $FF,$FF,$FF           
-.byte $FF,$FF,$FF           
-.byte $FF,$FF,$FF          
-.byte $FF,$FF,$FF        
-.byte $FF,$FF,$FF           
-.byte $FF,$FF,$FF     
-.byte $FF,$FF,$FF         
-.byte $FF,$FF,$FF,$FF       
+;Freespace from here on. 43 bytes in NTSC (and Gamecube, obviously) version, PAL version leaves only 7 bytes.
 
 .segment "SOUND"				;sound engine goes here (specific address can be found in LinkerConfiguration.cfg).
 
-CODE_F8A7:
+SoundEngine_F8A7:
    NOP						;\and a bunch of NOPs that are here just because...?
    NOP						;|
    NOP						;|
@@ -11983,7 +12377,7 @@ DATA_FE64:
 DATA_FE95:
 .byte $5D,$78,$5D,$78,$5C,$78,$5C,$62
 .byte $E6,$65,$5E,$65,$5E,$64,$5E,$40
-.byte $5E,$F8,$00      
+.byte $5E,$F8,$00
 
 ;Unused! a leftover from somewhere? maybe square sound? because with noise it doesnt sound good.
 DATA_FEA8:
@@ -12066,6 +12460,8 @@ DATA_FFC2:
 .byte $40,$44,$44,$44,$40,$44,$44,$44
 .byte $40,$44,$44,$44,$40,$44,$44,$84
 .byte $84,$84,$84,$84,$44,$44,$44,$05
+
+;NO freespace
 
 .segment "VECTORS"
    .word NMI_C07D

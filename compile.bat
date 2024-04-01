@@ -1,5 +1,5 @@
-@del MarioBros.o
-@del MarioBros.nes
+@del MarioBrosDis.o
+@del MarioBrosDis.nes
 @echo.
 @echo Compiling...
 cc65\bin\ca65 MarioBrosDisCA65.asm -g -o MarioBrosDis.o
