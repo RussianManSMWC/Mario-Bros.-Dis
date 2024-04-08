@@ -79,7 +79,7 @@ Gamecube_CODE_BFF9:
 
 RESET_C000:
    CLD						;Disable Decimal Mode
-   SEI						;set as interrupt
+   SEI						;set interrupt disable
 
 vblankloop_C002:
    LDA HardwareStatus				;V-blank loop 1 to waste some cycles
@@ -1761,8 +1761,8 @@ CODE_C8C7:
    CMP #GFX_Player_Skid1			;play turning sound when this frame shows up
    BNE CODE_C8D1				;
 
-   LDA Sound_Effect2				;
-   ORA #Sound_Effect2_Turning			;
+   LDA Sound_Effect2				;skidding sound
+   ORA #Sound_Effect2_Skidding			;
 
 CODE_C8CF:
    STA Sound_Effect2				;
@@ -4925,7 +4925,7 @@ CODE_D7AA:
    BNE CODE_D7C1				;not applicable to angry sidestepper, freezie or coin
 
    LDA Sound_Effect2				;
-   ORA #Sound_Effect2_EnemyHit			;hit enemy sound
+   ORA #Sound_Effect2_EnemyBumped		;hit enemy sound
    STA Sound_Effect2				;
 
 CODE_D7C1:
@@ -11337,449 +11337,494 @@ SoundEngine_F8A7:
    NOP						;/
    LDA #$C0					;\
    STA APU_FrameCounter				;/set APU frame counter to 4-step sequence and clear frame interrupt flag
-   JSR CODE_FA91				;play sound effects and music and stuff
+
+   JSR HandleAllSound_FA91			;play sound effects and music and stuff
 
    LDA #$00					;\clear sound effect triggers
    STA Sound_Effect2				;|
    STA Sound_Effect				;|
    STA Sound_Jingle				;|
-   STA $4011					;/and DMC load counter
+   STA APU_DMCLoadCounter			;/and DMC load counter (why?)
    RTS						;
 
-CODE_F8C2:
-   LDX #$90
-   BNE CODE_F8CB
+;simply disables square 1 channel
+MuteSquare1_F8C2:
+   LDX #$90					;constant volume (no volume) and duty output waveform 50%
+   BNE SetSquare1DutyAndVolume_F8CB		;
 
-CODE_F8C6:   
-   LDY #$7F 
+;only takes X as an input, see below
+SetSquare1DutyAndVolumeWithNoSweep_F8C6:
+   LDY #$7F					;default APU sweep (disabled)
 
-CODE_F8C8:   
-   STY $4001
-   
-CODE_F8CB:
-   STX $4000                
-   RTS                      
+;input:
+;Y - pulse sweep bits
+;X - pulse duty and volume bits
+SetSquare1DutyAndVolumeAndSweep_F8C8:
+   STY APU_Square1Sweep				;set pulse sweep (or don't)
 
-CODE_F8CF:
-   STX $F1                  
-   STY $F0                  
-   BNE CODE_F8D8
-   
-CODE_F8D5:
-   JSR CODE_F8C8                
-   
-CODE_F8D8:
-   LDX #$00					;timer for pulse 1
+SetSquare1DutyAndVolume_F8CB:
+   STX APU_Square1DutyAndVolume			;
+   RTS						;
 
-;used to set channel timer something
-CODE_F8DA:
+;X - sound's length, Y - Sound_Effect2 that we're currently playing, A - frequency value index, for below lookup table
+InitalizeSquare1SFX_F8CF:
+   STX Sound_Effect2_Length			;
+   STY Sound_Effect2_Current			;remember the SFX we're playing
+   BNE SetSquare1Frequency_F8D8			;
+
+SetSquare1Regs_F8D5:
+   JSR SetSquare1DutyAndVolumeAndSweep_F8C8	;
+
+SetSquare1Frequency_F8D8:
+   LDX #$00					;store to square 1 channel registers
+
+;Input A - frequency lookup table index
+SetChannelFrequency_F8DA:
    TAY						;
-   LDA DATA_F900+1,y				;
-   BEQ CODE_F8EB
-   STA $4002,x
-   LDA DATA_F900,y
-   ORA #$08
-   STA $4003,x
-   
-CODE_F8EB:
-   RTS
-   
-CODE_F8EC:
-   JSR CODE_F96D
-   
-CODE_F8EF:
-   LDX #$04					;timer for pulse 2
-   BNE CODE_F8DA
+   LDA ChannelFrequencyLookup_F900+1,y		;
+   BEQ NoChannelFrequency_F8EB			;if zero, no frequency for you!
+   STA APU_ChannelFrequency,x			;store low byte
 
-CODE_F8F3:   
-   TXA                      
-   AND #$3E                 
-   LDX #$08					;timer for triangle
-   BNE CODE_F8DA
+   LDA ChannelFrequencyLookup_F900,y		;
+   ORA #$08					;ensures that the note is held for long & doesn't end abruptly (doesn't matter much for triangle with its two timers, where one is shorter)
+   STA APU_ChannelFrequencyHigh,x		;
+
+NoChannelFrequency_F8EB:
+   RTS						;
+
+SetSquare2Regs_F8EC:
+   JSR SetSquare2DutyAndVolumeAndSweep_F96D	;
+
+SetSquare2Frequency_F8EF:
+   LDX #$04					;setting frequency for square 2
+   BNE SetChannelFrequency_F8DA			;
+
+;unlike others, uses X input as an index for frequency lookup instead of A
+SetTriangleFrequency_F8F3:
+   TXA						;
+   AND #$3E					;
+   LDX #$08					;setting frequency for triangle
+   BNE SetChannelFrequency_F8DA			;
 
 DATA_F8FA:
 .byte $85,$85,$85,$8D,$8D,$8D
 
-DATA_F900:
-.byte $01
-.byte $C4,$00,$00,$00,$69,$00,$D4
-.byte $00,$C8,$00,$BD,$00,$B2,$00
-.byte $A8,$00,$9F,$00,$8D,$00,$85
-.byte $00,$7E,$00,$76,$00,$70,$01
-.byte $AB,$01,$7C,$01,$67,$01,$52
-.byte $01,$3F,$01,$1C,$01,$0C,$00
-.byte $FD,$00,$EE,$00,$E1,$03,$57
-.byte $02,$F9,$02,$A6,$02,$80,$02
-.byte $3A,$02,$1A,$01,$FC,$01,$DF
-.byte $06,$AE,$05,$F3,$05,$4D,$05
-.byte $01,$04,$75,$03,$89,$00,$53
+;These values are used to calculate the frequency of the sound channels in hz (basically contain period values)
+;Pulse channels use this formula:
+;[Clock Speed]/(16*(period+1)*1000000
+;where [Clock Speed] is NES's CPU clock speed (NTSC = 1,789773, PAL = 1,662607)
+;Period - 11-bit value stored at APU_ChannelFrequency and APU_ChannelFrequencyHigh (the values are represented in the table below)
+;Triangle uses the same formula but divided by two
+;Noise uses its own 4-bit lookup table for specific frequency values (see https://www.nesdev.org/wiki/APU_Noise for these specific values)
+;
+;EXAMPLE:
+;period = $017C (380 in dec), system is NTSC, calculating for pulse:
+;1,789773/(16*(380+1))*1000000 = 293hz
+;
+;If the value is $0000, the frequency setup will be skipped
 
-DATA_F94E:
-.byte $03,$07,$0E,$1C,$38,$15,$2A
-.byte $04,$08,$10,$20,$40,$18,$30
-.byte $06,$05,$0A,$14,$28,$50,$1E
-.byte $3C,$04,$0B,$16,$2C,$58,$21
-.byte $07
+ChannelFrequencyLookup_F900:
+.dbyt $01C4,$0000,$0069,$00D4
+.dbyt $00C8,$00BD,$00B2,$00A8
+.dbyt $009F,$008D,$0085,$007E
+.dbyt $0076,$0070,$01AB,$017C
+.dbyt $0167,$0152,$013F,$011C
+.dbyt $010C,$00FD,$00EE,$00E1
+.dbyt $0357,$02F9,$02A6,$0280
+.dbyt $023A,$021A,$01FC,$01DF
+.dbyt $06AE,$05F3,$054D,$0501
+.dbyt $0475,$0389,$0053
 
-CODE_F96B:
-   LDY #$7F
+ChannelLengthLookup_F94E:
+.byte $03,$07,$0E,$1C,$38,$15,$2A,$04
+.byte $08,$10,$20,$40,$18,$30,$06,$05
+.byte $0A,$14,$28,$50,$1E,$3C,$04,$0B
+.byte $16,$2C,$58,$21,$07
 
-CODE_F96D:  
-   STX $4004                
-   STY $4005                
-   RTS
+SetSquare2DutyAndVolumeWithNoSweep_F96B:
+   LDY #$7F					;no sweep for square
 
-;Y into A, shift right 5 times
-CODE_F974:
+;input:
+;Y - pulse sweep bits
+;X - pulse duty and volume bits
+SetSquare2DutyAndVolumeAndSweep_F96D:
+   STX APU_Square2DutyAndVolume			;
+   STY APU_Square2Sweep				;
+   RTS						;
+
+;divide base value by 32
+SubstractOne32nd_F974:
    TYA						;
    LSR A					;
    LSR A					;
    LSR A					;
 
-;shift right 2 tiles
-CODE_F978:
+;divide by 4
+SubstractOne4th_F978:
    LSR A					;
 
-;shift right 1 time
-CODE_F979:
+;divide by 2
+SubstractHalf_F979:
    LSR A					;
    STA $00					;
 
-;base value from Y minus the shifted value
+;base value minus the divided one (either base-(1/2), base-(1/4) or base-(1/32))
    TYA						;
    SEC						;
-   SBC $00					;
+   SBC $00					;output A
    RTS						;
 
-CODE_F981:
-   TAX                      
-   ROR A                    
-   TXA                      
-   ROL A                    
-   ROL A                    
-   ROL A
+;AlternateLengthHandler in SMB (i just stole those labels because idk what else to call these)
+;to be honest, idk what this is for really (it calculates the note length index thing by shifting bits and used for everything but square 2 during jingle)
+AlternateLengthHandler_F981:
+   TAX						;
+   ROR A					;
+   TXA						;
+   ROL A					;
+   ROL A					;
+   ROL A					;changes xx00000x into 00000xxx
 
-CODE_F987:   
-   AND #$07                 
-   CLC                      
-   ADC $068D                
-   TAY                      
-   LDA DATA_F94E,Y              
-   RTS
-   
+ProcessLengthData_F987:
+   AND #$07					;
+   CLC						;
+   ADC Sound_NoteLengthOffset			;
+   TAY 						;
+   LDA ChannelLengthLookup_F94E,Y		;get note length from this little table
+   RTS						;
+
+;sweep values for enemy dying SFX
 DATA_F992:
-.byte $8C,$84,$83,$8D,$8D,$83,$83,$8B
-.byte $8C,$83,$8B
+.byte $8C,$84,$83,$8D,$8D,$83
 
+;these are for LastEnemyKicked SFX (produce high pitch pulses)
+DATA_F997:
+.byte $83,$8B,$8C,$83,$8B,$8C
+
+;sweep values for player dying SFX
 DATA_F99D:
-.byte $8C,$8A,$8A,$8B,$8B
+.byte $8A,$8A,$8B,$8B
 
-CODE_F9A2:
-   STY $F0
-   
-   LDA #$85
-   STA $F1
-   
-   LDA #$FE
-   STA $F2
-   
-   LDX #$84                 
-   LDY #$8A         
-   LDA #$2A                 
-   JSR CODE_F8D5
- 
- CODE_F9B5:
-   DEC $F1
-   
-   LDA $F1                  
-   BNE CODE_F9BE                
-   JMP CODE_FAEF
-  
+;start playing PlayerDead SFX
+InitPlayerDeadSFX_F9A2:
+   STY Sound_Effect2_Current			;don't forget that we're currently playing this SFX
+
+   LDA #$85					;
+   STA Sound_Effect2_Length			;the sound effect will play for this long
+
+   LDA #$FE					;base frequency
+   STA Sound_Square_Frequency			;
+
+   LDX #$84					;Base Duty & Volume
+   LDY #$8A					;Base Sweep
+   LDA #$2A					;Base Frequency
+   JSR SetSquare1Regs_F8D5			;
+
+;currently playing PlayerDead SFX
+PlayPlayerDeadSFX_F9B5:
+   DEC Sound_Effect2_Length			;obviously tick down the duration of the sfx
+
+   LDA Sound_Effect2_Length			;
+   BNE CODE_F9BE				;see if the sound effect is still going
+   JMP EndPlaying_Sound_Effect2_FAEF		;shut up, square channel!
+
 CODE_F9BE:
-   CMP #$40                 
-   BEQ CODE_F9DD                
-   BCC CODE_F9E3                
-   CMP #$78                 
-   BCC CODE_F9D8                
-   LSR A                    
-   BCS CODE_FA1B
-   
-   LDA $F2                  
-   TAY                      
-   JSR CODE_F978                
-   STA $F2                  
-   STA $4002                
-   BNE CODE_FA1B
-  
+   CMP #$40					;
+   BEQ CODE_F9DD				;the frequency's base will change 
+   BCC CODE_F9E3				;
+   CMP #$78					;
+   BCC CODE_F9D8				;
+   LSR A					;
+   BCS CODE_FA1B				;
+
+   LDA Sound_Square_Frequency			;
+   TAY						;
+   JSR SubstractOne4th_F978			;alter frequency this way...
+   STA Sound_Square_Frequency			;square frequency storage
+   STA APU_Square1Frequency			;
+   BNE CODE_FA1B				;
+
 CODE_F9D8:
-   JSR CODE_F8C2                
-   BNE CODE_FA1B
-  
+   JSR MuteSquare1_F8C2				;disable square 1 channel
+   BNE CODE_FA1B				;will always branch
+
 CODE_F9DD:
-   LDA #$35                 
-   STA $F2                  
-   BNE CODE_F9F2
-  
+   LDA #$35					;
+   STA Sound_Square_Frequency			;
+   BNE CODE_F9F2				;
+
 CODE_F9E3:
-   LDX #$9C                 
-   CMP #$18                 
-   BCS CODE_F9ED                
-   LSR A                    
-   ORA #$90                 
-   TAX
-   
+   LDX #$9C					;
+   CMP #$18					;
+   BCS CODE_F9ED				;
+   LSR A					;
+   ORA #$90					;
+   TAX						;
+
 CODE_F9ED:
-   DEC $06B7                
-   BNE CODE_FA11
+   DEC Sound_PlayerDeadSFX_SweepIndex		;
+   BNE CODE_FA11				;
 
-CODE_F9F2:  
-   LDA #$04                 
-   STA $06B7
-   
-   LDA $F2                  
-   LSR A                    
-   LSR A                    
-   LSR A                    
-   LSR A                    
-   SEC                      
-   ADC $F2                  
-   STA $F2   
-   ASL A                    
-   ASL A                    
-   STA $4002
-   
-   LDA $F2                  
-   ROL A                    
-   ROL A                    
-   ROL A                    
-   AND #$03                 
-   STA $4003
-  
+CODE_F9F2:
+   LDA #$04					;
+   STA Sound_PlayerDeadSFX_SweepIndex		;
+
+   LDA Sound_Square_Frequency			;an elaborate frequency calculating thing
+   LSR A					;
+   LSR A					;
+   LSR A					;
+   LSR A					;
+   SEC						;
+   ADC Sound_Square_Frequency			;
+   STA Sound_Square_Frequency			;
+   ASL A					;
+   ASL A					;
+   STA APU_Square1Frequency			;
+
+   LDA Sound_Square_Frequency			;
+   ROL A					;
+   ROL A					;
+   ROL A					;
+   AND #$03					;
+   STA APU_Square1FrequencyHigh			;
+
 CODE_FA11:
-   LDY $06B7                
-   LDA DATA_F99D,Y              
-   TAY                      
-   JSR CODE_F8C8
-  
-CODE_FA1B:
-   JMP CODE_FD27
-   
-CODE_FA1E:
-   STY $F0
-   LDA #$14                 
-   STA $F1                  
-   LDX #$85                 
-   LDY #$85                 
-   LDA #$30                 
-   JSR CODE_F8D5                
+   LDY Sound_PlayerDeadSFX_SweepIndex		;
+   LDA DATA_F99D-1,Y				;
+   TAY						;
+   JSR SetSquare1DutyAndVolumeAndSweep_F8C8	;
 
-CODE_FA2D:
-   LDA $F1
-   CMP #$0D
-   BNE CODE_FA38
-   
-   LDA #$30
-   JSR CODE_F8D8
+CODE_FA1B:
+   JMP HandleSound_Jingle_FD27			;last but not least, jinglez
+
+InitPOWBumpSFX_FA1E:
+   STY Sound_Effect2_Current			;
+
+   LDA #$14					;the sound effect only plays for this long
+   STA Sound_Effect2_Length			;
+
+   LDX #$85					;
+   LDY #$85					;
+   LDA #$30					;
+   JSR SetSquare1Regs_F8D5			;how it starts out
+
+PlayPOWBumpSFX_FA2D:
+   LDA Sound_Effect2_Length			;if reached this point, the tone will be different
+   CMP #$0D					;
+   BNE CODE_FA38				;
+
+   LDA #$30					;that's it, really, it's just two different tones
+   JSR SetSquare1Frequency_F8D8			;
 
 CODE_FA38:
-   JMP CODE_FAEB
-   
-CODE_FA3B:
-   LDX #$6E
-   LDA #$12
-   JSR CODE_F8CF
-   BNE CODE_FA5B
-   
-CODE_FA44:
-   LDA $F1
-   CMP #$50
-   BCS CODE_FA5F
-   CMP #$46
-   BCS CODE_FA71
-   CMP #$37
-   BCS CODE_FA5F
-   BCC CODE_FA71
-   
-CODE_FA54:
-   LDX #$1E
-   LDA #$06
-   JSR CODE_F8CF
-   
-CODE_FA5B:
-   LDA #$06
-   STA $F2
-   
-CODE_FA5F:
-   LDX $F2
-   
-   LDY DATA_F992-1,x
-   BNE CODE_FA76
-   
-CODE_FA66:
-   LDX #$10
-   LDA #$22
-   
-   JSR CODE_F8CF
-   
-   LDA #$06
-   STA $F2
-   
-CODE_FA71:
-   LDX $F2
-   LDY DATA_F992+5,x
-   
-CODE_FA76:
-   DEC $F2
-   BNE CODE_FA7E
-   
-   LDA #$06
-   STA $F2
-   
-CODE_FA7E:
-   LDX #$9A
-   LDA $F1
-   CMP #$0A
-   BCS CODE_FAE8
-   BCC CODE_FAE5
-   
-CODE_FA88:
-   JMP CODE_F9A2
-   
-CODE_FA8B:
-   JMP CODE_F9B5
-   
-CODE_FA8E:
-   JMP CODE_FA1E
+   JMP CODE_FAEB				;
 
-CODE_FA91:
-   LDA $FA					;check Sound_Effect2 first
-   BNE CODE_FAD1				;
+;start playing Sound_Effect2_LastEnemyDead
+InitLastEnemyDeadSFX_FA3B:
+   LDX #$6E					;sweep time init
+   LDA #$12					;load the frequency stuff
+   JSR InitalizeSquare1SFX_F8CF			;initialize square registers and such
+   BNE CODE_FA5B				;share part with standard enemy kick sfx
+
+PlayLastEnemyDeadSFX_FA44:
+   LDA Sound_Effect2_Length			;
+   CMP #$50					;
+   BCS CODE_FA5F				;lower pitch
+   CMP #$46					;
+   BCS CODE_FA71				;back to high
+   CMP #$37					;
+   BCS CODE_FA5F				;low again
+   BCC CODE_FA71				;the remaining time it'll sweep towards high pitch (shared with another SFX)
+
+InitEnemyKickedSFX_FA54:
+   LDX #$1E					;
+   LDA #$06					;
+   JSR InitalizeSquare1SFX_F8CF			;
+
+;shared with InitLastEnemyDeadSFX
+CODE_FA5B:
+   LDA #$06					;
+   STA Sound_Square_SweepIndex			;
+
+;shared with PlayLastEnemyDeadSFX
+PlayEnemyKickedSFX_FA5F:
+CODE_FA5F:
+   LDX Sound_Square_SweepIndex			;
+   LDY DATA_F992-1,x				;sweep towards lower pitch
+   BNE CODE_FA76				;
+
+InitEnemyBumpedSFX_FA66:
+   LDX #$10					;
+   LDA #$22					;
+   JSR InitalizeSquare1SFX_F8CF			;
+
+   LDA #$06					;
+   STA Sound_Square_SweepIndex			;
+
+;SquareSweepUp (???)
+PlayEnemyBumpedSFX_FA71:
+CODE_FA71:
+   LDX Sound_Square_SweepIndex			;
+   LDY DATA_F997-1,x				;sweep towards high pitch
+
+CODE_FA76:
+   DEC Sound_Square_SweepIndex			;
+   BNE CODE_FA7E				;next sweep value (or reset it)
+
+   LDA #$06					;reset index/timer
+   STA Sound_Square_SweepIndex			;
+
+CODE_FA7E:
+   LDX #$9A					;square reg 1 bits
+   LDA Sound_Effect2_Length			;
+   CMP #$0A					;
+   BCS CODE_FAE8				;
+   BCC CODE_FAE5				;
+
+Long_InitPlayerDeadSFX_FA88:
+   JMP InitPlayerDeadSFX_F9A2			;the code is too far, take a jump there
+
+Long_PlayPlayerDeadSFX_FA8B:
+   JMP PlayPlayerDeadSFX_F9B5			;up, up, and away!
+
+Long_InitPOWBumpSFX_FA8E:
+   JMP InitPOWBumpSFX_FA1E			;
+
+HandleAllSound_FA91:
+HandleSound_Effect2_FA91:
+   LDA Sound_JingleSquareTrackOffset		;if squre is occupied by the jingle (most likely it is)
+   BNE CODE_FAD1				;ignore SFX that use square channels
 
    LDY Sound_Effect2				;Sound_Effect2 into Y in case we init playing the sound
-   LDA $F0					;Sound_Effect2 that is currently playing
+   LDA Sound_Effect2_Current			;Sound_Effect2 that is currently playing
    LSR A					;
-   BCS CODE_FA8B				;continue playing Sound_Effect2_PlayerDead
+   BCS Long_PlayPlayerDeadSFX_FA8B		;continue playing Sound_Effect2_PlayerDead
 
    LSR Sound_Effect2				;
-   BCS CODE_FA88				;init sound Sound_Effect2_PlayerDead
+   BCS Long_InitPlayerDeadSFX_FA88		;init sound Sound_Effect2_PlayerDead
 
    LSR A					;
-   BCS CODE_FA2D				;continue playing Sound_Effect2_POWBump
+   BCS PlayPOWBumpSFX_FA2D			;continue playing Sound_Effect2_POWBump
 
    LSR Sound_Effect2				;
-   BCS CODE_FA8E				;init sound Sound_Effect2_POWBump
+   BCS Long_InitPOWBumpSFX_FA8E			;init sound Sound_Effect2_POWBump
 
    LSR A					;
-   BCS CODE_FA44				;continue playing Sound_Effect2_LastEnemyDead
+   BCS PlayLastEnemyDeadSFX_FA44		;continue playing Sound_Effect2_LastEnemyDead
 
    LSR Sound_Effect2				;
-   BCS CODE_FA3B				;init Sound_Effect2_LastEnemyDead
+   BCS InitLastEnemyDeadSFX_FA3B		;init Sound_Effect2_LastEnemyDead
 
    LSR Sound_Effect2				;
-   BCS CODE_FA54				;init Sound_Effect2_EnemyKicked (since it's before "continue playing Sound_Effect2_EnemyKicked", it can interrupt the sound effect and restart playing it)
+   BCS InitEnemyKickedSFX_FA54			;init Sound_Effect2_EnemyKicked (since it's before "continue playing Sound_Effect2_EnemyKicked", it can interrupt the sound effect and restart playing it)
 
    LSR A					;
-   BCS CODE_FA5F				;continue playing Sound_Effect2_EnemyKicked
+   BCS PlayEnemyKickedSFX_FA5F			;continue playing Sound_Effect2_EnemyKicked
 
    LSR A					;
-   BCS CODE_FA71				;continue playing Sound_Effect2_EnemyHit
+   BCS PlayEnemyBumpedSFX_FA71			;continue playing Sound_Effect2_EnemyBumped
 
    LSR Sound_Effect2				;
-   BCS CODE_FA66				;init Sound_Effect2_EnemyHit
+   BCS InitEnemyBumpedSFX_FA66			;init Sound_Effect2_EnemyBumped
 
    LSR A					;
-   BCS CODE_FADB				;continue playing Sound_Effect2_Jump
+   BCS PlayJumpSFX_FADB				;continue playing Sound_Effect2_Jump
 
    LSR Sound_Effect2				;
-   BCS CODE_FAD4				;init sound Sound_Effect2_Jump
+   BCS InitJumpSFX_FAD4				;init sound Sound_Effect2_Jump
 
    LSR A					;
-   BCS CODE_FAFF				;continue playing Sound_Effect2_Turning
+   BCS PlaySkiddingSFX_FAFF			;continue playing Sound_Effect2_Skidding
 
    LSR Sound_Effect2				;
-   BCS CODE_FAF8				;init sound Sound_Effect2_Turning
+   BCS InitSkiddingSFX_FAF8			;init sound Sound_Effect2_Skidding
 
    LSR A					;
-   BCS CODE_FB24				;continue playing Sound_Effect2_Step
+   BCS PlayStepSFX_DB24				;continue playing Sound_Effect2_Step
 
    LSR Sound_Effect2				;
-   BCS CODE_FB0F				;init sound Sound_Effect2_Step
-   
+   BCS InitStepSFX_FB0F				;init sound Sound_Effect2_Step
+
 CODE_FAD1:
-   JMP CODE_FCC9				;
-   
-CODE_FAD4:
-   LDX #$11
-   LDA #$34
-   JSR CODE_F8CF
-   
-CODE_FADB:
-   LDA $F1
-   LDY #$8C
-   CMP #$08
-   BCC CODE_FAE5
+   JMP HandleSound_Loop_FCC9			;move onto other sounds and jingles
 
-   LDA #$08
-   
+;start playing Jump SFX
+InitJumpSFX_FAD4:
+   LDX #$11					;
+   LDA #$34					;
+   JSR InitalizeSquare1SFX_F8CF			;
+
+;continue playing Jump SFX
+PlayJumpSFX_FADB:
+   LDA Sound_Effect2_Length			;
+   LDY #$8C					;
+   CMP #$08					;
+   BCC CODE_FAE5				;
+
+   LDA #$08					;
+
 CODE_FAE5:
-   ORA #$90
-   TAX
-   
+   ORA #$90					;
+   TAX						;
+
 CODE_FAE8:
-   JSR CODE_F8C8
-   
+   JSR SetSquare1DutyAndVolumeAndSweep_F8C8	;
+
 CODE_FAEB:
-   DEC $F1
-   BNE CODE_FAD1
-   
-CODE_FAEF:
-   JSR CODE_F8C2
+   DEC Sound_Effect2_Length			;
+   BNE CODE_FAD1				;
 
-   LDA #$00
-   STA $F0
-   BEQ CODE_FAD1
-   
-CODE_FAF8:
-   LDX #$09
-   LDA #$04
-   JSR CODE_F8CF
-   
-CODE_FAFF:
-   LDY #$84
-   
-   LDA $F1
-   CMP #$04                 
-   BEQ CODE_FAEF                
-   CMP #$08                 
-   BCS CODE_FAE5
-   
-   LDY #$8B                 
-   BNE CODE_FAE5
-   
-CODE_FB0F:
-   STY $F0
-   
-   LDA #$05                 
-   STA $F1
+EndPlaying_Sound_Effect2_FAEF:
+   JSR MuteSquare1_F8C2				;no longer playing sound on square 1 channel
 
-   INC Sound_Effect2_Step_Counter			;playing Step sound effect again, count that up
-   LDA Sound_Effect2_Step_Counter			;
-   AND #$07						;
-   TAY							;
-   LDA DATA_FB32,Y					;each different step is a different pulse
-   JSR CODE_F8D8					;
-   
-CODE_FB24:
-   LDA $F1                  
-   LDY #$7F                 
-   LDX #$90                 
-   CMP #$04                 
-   BCS CODE_FAE5
-   
-   LDA #$04                 
-   BCC CODE_FAE8
+   LDA #$00					;
+   STA Sound_Effect2_Current			;no longer playing Sound_Effect2
+   BEQ CODE_FAD1				;
 
-;
+;start playing Turning SFX
+InitSkiddingSFX_FAF8:
+   LDX #$09					;
+   LDA #$04					;
+   JSR InitalizeSquare1SFX_F8CF			;
+
+;continue playing Turning SFX
+PlaySkiddingSFX_FAFF:
+   LDY #$84					;
+
+   LDA Sound_Effect2_Length			;
+   CMP #$04					;
+   BEQ EndPlaying_Sound_Effect2_FAEF		;
+   CMP #$08					;
+   BCS CODE_FAE5				;
+
+   LDY #$8B					;
+   BNE CODE_FAE5				;
+
+;start playing Step SFX
+InitStepSFX_FB0F:
+   STY Sound_Effect2_Current			;
+
+   LDA #$05					;only plays for 5 frames
+   STA Sound_Effect2_Length			;
+
+   INC Sound_Effect2_Step_Counter		;playing Step sound effect again, count that up
+   LDA Sound_Effect2_Step_Counter		;
+   AND #$07					;
+   TAY						;
+   LDA DATA_FB32,Y				;each different step is a different pulse
+   JSR SetSquare1Frequency_F8D8			;
+
+;continue playing Step SFX
+PlayStepSFX_DB24:
+   LDA Sound_Effect2_Length			;
+   LDY #$7F					;
+   LDX #$90					;
+   CMP #$04					;
+   BCS CODE_FAE5				;
+
+   LDA #$04					;
+   BCC CODE_FAE8				;
+
+;frequency indexes for different player walking steps
 DATA_FB32:
 .byte $26,$22,$26,$22,$26,$22,$1C,$22
 
@@ -11787,342 +11832,370 @@ DATA_FB32:
 DATA_FB3A:
 .byte $83,$84,$82,$8E
 
-CODE_FB3E:
-   STY $FB
-   
-   LDA #$60                 
-   STA $F3
-   
-   LDA #$19                 
-   STA $F4
+;start playing FreezieExplode SFX
+InitFreezieExplodeSFX_FB3E:
+   STY Sound_Effect_Current			;
 
-CODE_FB48:
-   LDA $F3                  
-   AND #$07                 
-   BNE CODE_FB6C
-   
-   LDA $F4                  
-   AND RandomNumberStorage			;sound effect and RNG? (i think this is freezy sound?)
-   LSR A                    
-   LSR A                    
-   CLC                      
-   ADC $F4
-   BCS CODE_FB5C                
-   STA $F4
-  
+   LDA #$60					;
+   STA Sound_Effect_Length			;
+
+   LDA #$19					;
+   STA Sound_Square2_Frequency			;
+
+;continue playing FreezieExplode SFX
+PlayFreezieExplodeSFX_FB48:
+   LDA Sound_Effect_Length			;
+   AND #$07					;
+   BNE CODE_FB6C				;
+
+   LDA Sound_Square2_Frequency			;
+   AND RandomNumberStorage			;slightly random sound
+   LSR A					;
+   LSR A					;
+   CLC						;
+   ADC Sound_Square2_Frequency			;
+   BCS CODE_FB5C				;
+   STA Sound_Square2_Frequency			;
+
 CODE_FB5C:
-   LDA $F4                  
-   ROL A                    
-   ROL A                    
-   ROL A                    
-   STA $4006
+   LDA Sound_Square2_Frequency			;
+   ROL A					;
+   ROL A					;
+   ROL A					;
+   STA APU_Square2Frequency			;
 
-   ROL A                    
-   AND #$07                 
-   ORA #$08                 
-   STA $4007
+   ROL A					;
+   AND #$07					;the extra 3 bits for the frequency thing
+   ORA #$08					;hold the note for the longest time
+   STA APU_Square2FrequencyHigh			;
 
 CODE_FB6C:
-   LDA RandomNumberStorage			;freezie still?
-   AND #$03                 
-   LDA DATA_FB3A,Y              
-   STA $4005                
-   JMP CODE_FCA7
+   LDA RandomNumberStorage			;freezie's sweep is somewhat random
+   AND #$03					;
+   LDA DATA_FB3A,Y				;
+   STA APU_Square2Sweep				;
+   JMP CODE_FCA7				;
 
-CODE_FB7A:
-   STY $FB
-   
-   LDA #$28                 
-   STA $F3
-   
-   LDA #$FE                 
-   STA $F4
-   
-   JSR CODE_F96B                
-   
-CODE_FB87:
-   LDY $F4                  
-   LDA $F3                  
-   AND #$03                 
-   BEQ CODE_FB9A                
-   CMP #$03                 
-   BEQ CODE_FBA0                
-   TYA                      
-   JSR CODE_F979                
-   TAY                      
-   BNE CODE_FBA0
-  
+;start playing DestroyedFreezie SFX
+InitDestroyedFreezieSFX_FB7A:
+   STY Sound_Effect_Current			;
+
+   LDA #$28					;
+   STA Sound_Effect_Length			;
+
+   LDA #$FE					;
+   STA Sound_Square2_Frequency			;
+
+   JSR SetSquare2DutyAndVolumeWithNoSweep_F96B	;
+
+PlayDestroyedFreezieSFX_FB87:
+   LDY Sound_Square2_Frequency			;
+   LDA Sound_Effect_Length			;
+   AND #$03					;
+   BEQ CODE_FB9A				;
+   CMP #$03					;
+   BEQ CODE_FBA0				;
+
+   TYA						;
+   JSR SubstractHalf_F979			;
+   TAY						;
+   BNE CODE_FBA0				;
+
 CODE_FB9A:
-   TYA                      
-   JSR CODE_F978                
-   STA $F4
+   TYA						;
+   JSR SubstractOne4th_F978			;
+   STA Sound_Square2_Frequency			;
 
-CODE_FBA0:  
-   TYA                      
-   CLC                      
-   ROL A                    
-   ROL A                    
-   STA $4006                
-   ROL A                    
-   STA $4007                
-   JMP CODE_FCA7
-   
+CODE_FBA0:
+   TYA						;
+   CLC						;
+   ROL A					;
+   ROL A					;
+   STA APU_Square2Frequency			;
+   ROL A					;
+   STA APU_Square2FrequencyHigh			;
+   JMP CODE_FCA7				;
+
 CODE_FBAE:
-   STY $FB
-   
-   LDA #$1D                 
-   STA $F3
-   
-   LDA #$08                 
-   STA $F4
-   
-   LDA #$1A                 
-   BNE CODE_FBC4
-   
-CODE_FBBC:
-   LDA $F3                  
-   CMP #$1A                 
-   BNE CODE_FBC7
-   
-   LDA #$4C
-  
+   STY Sound_Effect_Current			;
+
+   LDA #$1D					;
+   STA Sound_Effect_Length			;
+
+   LDA #$08					;
+   STA Sound_Square2_SweepIndex			;
+
+   LDA #$1A					;
+   BNE CODE_FBC4				;
+
+PlayCollectedCoinSFX_FBBC:
+   LDA Sound_Effect_Length			;
+   CMP #$1A					;
+   BNE CODE_FBC7				;
+
+   LDA #$4C					;
+
 CODE_FBC4:
-   JSR CODE_F8EF
-  
+   JSR SetSquare2Frequency_F8EF			;
+
 CODE_FBC7:
-   LDX #$86                 
-   DEC $F4                  
-   BNE CODE_FBD3
-   
-   LDA #$04                 
-   STA $F4                  
-   LDX #$46
-  
+   LDX #$86					;
+   DEC Sound_Square2_SweepIndex			;
+   BNE CODE_FBD3				;
+
+   LDA #$04					;
+   STA Sound_Square2_SweepIndex			;
+
+   LDX #$46					;
+
 CODE_FBD3:
-   JSR CODE_F96B                
-   BNE CODE_FC38
-   
-CODE_FBD8:
-   STY $FB                  
-   LDA #$20                 
-   STA $F3
-   
-   LDX #$46                 
-   LDY #$BE                 
-   LDA #$10                 
-   BNE CODE_FC35
+   JSR SetSquare2DutyAndVolumeWithNoSweep_F96B	;
+   BNE ContinuePlayng_Sound_Effect_FC38		;
 
-CODE_FBE6:   
-   JMP CODE_FB3E
-   
+InitCoinPipeExitSFX_FBD8:
+   STY Sound_Effect_Current			;
+
+   LDA #$20					;
+   STA Sound_Effect_Length			;
+
+   LDX #$46					;
+   LDY #$BE					;
+   LDA #$10					;
+   BNE StoreRegsAndContinuePlayingSFX_FC35	;
+
+Long_InitFreezieExplodeSFX_FBE6:
+   JMP InitFreezieExplodeSFX_FB3E		;
+
+Long_PlayFreezieExplodeSFX_FBE9:
 CODE_FBE9:
-   JMP CODE_FB48                
-  
-CODE_FBEC:
-   LDY $FE                  
-   LDA $FB                  
-   LSR A                    
-   BCS CODE_FB87
-   
-   LSR $FE                  
-   BCS CODE_FB7A                
-   LSR $FE                  
-   BCS CODE_FBAE                
-   LSR A                    
-   BCS CODE_FBBC                
-   LSR A                    
-   BCS CODE_FBE9                
-   LSR $FE                  
-   BCS CODE_FBE6                
-   LSR $FE                  
-   BCS CODE_FBD8                
-   LSR A                    
-   BCS CODE_FC38                
-   LSR $FE                  
-   BCS CODE_FC29                
-   LSR A                    
-   BCS CODE_FC38                
-   LSR $FE                  
-   BCS CODE_FC46                
-   LSR A                    
-   BCS CODE_FC38                
-   LSR $FE                  
-   BCS CODE_FC54                
-   LSR A                    
-   BCS CODE_FC5C                
-   LSR $FE                  
-   BCS CODE_FC79                
-   LSR A                    
-   BCS CODE_FC88                
-   
+   JMP PlayFreezieExplodeSFX_FB48		;
+
+HandleSound_Effect_FBEC:
+   LDY Sound_Effect				;
+   LDA Sound_Effect_Current			;see if we're playing an SFX currently
+   LSR A					;
+   BCS PlayDestroyedFreezieSFX_FB87		;continue playing Sound_Effect_DestroyedFreezie
+
+   LSR Sound_Effect				;
+   BCS InitDestroyedFreezieSFX_FB7A		;init Sound_Effect_DestroyedFreezie
+
+   LSR Sound_Effect				;
+   BCS CODE_FBAE				;init Sound_Effect_CollectedCoin
+
+   LSR A					;
+   BCS PlayCollectedCoinSFX_FBBC		;continue playing Sound_Effect_CollectedCoin
+
+   LSR A					;
+   BCS Long_PlayFreezieExplodeSFX_FBE9		;continue playing Sound_Effect_FreezieExplode
+
+   LSR Sound_Effect				;
+   BCS Long_InitFreezieExplodeSFX_FBE6		;init Sound_Effect_FreezieExplode
+
+   LSR Sound_Effect				;
+   BCS InitCoinPipeExitSFX_FBD8			;init Sound_Effect_CoinPipeExit
+
+   LSR A					;
+   BCS ContinuePlayng_Sound_Effect_FC38		;continue playing Sound_Effect_CoinPipeExit
+
+   LSR Sound_Effect				;
+   BCS InitShellCreeperPipeExitSFX_FC29		;init Sound_Effect_ShellCreeperPipeExit
+
+   LSR A					;
+   BCS ContinuePlayng_Sound_Effect_FC38		;continue playing Sound_Effect_ShellCreeperPipeExit
+
+   LSR Sound_Effect				;
+   BCS InitSidestepperPipeExitSFX_FC46		;init Sound_Effect_SidestepperPipeExit
+
+   LSR A					;
+   BCS ContinuePlayng_Sound_Effect_FC38		;continue playing Sound_Effect_SidestepperPipeExit
+
+   LSR Sound_Effect				;
+   BCS InitFighterFlyPipeExitSFX_FC54		;init Sound_Effect_FighterFlyPipeExit
+
+   LSR A					;
+   BCS PlayFighterFlyPipeExitSFX_FC5C		;continue playing Sound_Effect_FighterFlyPipeExit
+
+   LSR Sound_Effect				;
+   BCS InitSplashSFX_FC79			;init Sound_Effect_Splash
+
+   LSR A					;
+   BCS PlaySplashSFX_FC88			;continue playing Sound_Effect_Splash
+
 CODE_FC28:
-   RTS
-   
-CODE_FC29:
-   STY $FB
-   
-   LDA #$18                 
-   STA $F3
+   RTS						;nothing else to play
 
-   LDX #$44                 
-   LDY #$86                 
-   LDA #$2A                 
- 
-CODE_FC35:
-   JSR CODE_F8EC
-   
-CODE_FC38:
-   DEC $F3                  
-   BNE CODE_FC28
-   
-   LDA #$00                 
-   STA $FB
-   
-   LDA #$10                 
-   STA $4004                
-   RTS                      
-  
-CODE_FC46:
-   STY $FB
-   
-   LDA #$14                 
-   STA $F3
-   
-   LDX #$A0                 
-   LDY #$9D                 
-   LDA #$34                 
-   BNE CODE_FC35
-   
-CODE_FC54:
-   STY $FB                  
-   LDA #$2A                 
-   STA $F3
-   BNE CODE_FC60
-   
-CODE_FC5C:
-   DEC $F4                  
-   BNE CODE_FC69
-  
+;start playing Sound_Effect_ShellCreeperPipeExit
+InitShellCreeperPipeExitSFX_FC29:
+   STY Sound_Effect_Current			;
+
+   LDA #$18					;
+   STA Sound_Effect_Length			;
+
+   LDX #$44					;
+   LDY #$86					;
+   LDA #$2A					;
+
+StoreRegsAndContinuePlayingSFX_FC35:
+   JSR SetSquare2Regs_F8EC			;
+
+;generic code that keeps the length of the sound effect counting down
+ContinuePlayng_Sound_Effect_FC38:
+   DEC Sound_Effect_Length			;run until it stops
+   BNE CODE_FC28				;
+
+   LDA #$00					;
+   STA Sound_Effect_Current			;not playing SFX on square 2
+
+   LDA #$10					;constant volume bit is set (but no actual volume)
+   STA APU_Square2DutyAndVolume			;
+   RTS						;
+
+;start playing SidestepperPipeExit SFX
+InitSidestepperPipeExitSFX_FC46:
+   STY Sound_Effect_Current			;
+
+   LDA #$14					;
+   STA Sound_Effect_Length			;
+
+   LDX #$A0					;
+   LDY #$9D					;
+   LDA #$34					;
+   BNE StoreRegsAndContinuePlayingSFX_FC35	;cram those values in the registers (and count down the sound effect's length, of course, that's pretty important too I think)
+
+;start playing FighterFlyPipeExit SFX
+InitFighterFlyPipeExitSFX_FC54:
+   STY Sound_Effect_Current			;
+
+   LDA #$2A					;
+   STA Sound_Effect_Length			;
+   BNE CODE_FC60				;
+
+;continue playing FighterFlyPipeExit SFX
+PlayFighterFlyPipeExitSFX_FC5C:
+   DEC Sound_Square2_SweepIndex			;
+   BNE CODE_FC69				;
+
 CODE_FC60:
-   LDA #$04                 
-   JSR CODE_F8EF
-   
-   LDA #$06                 
-   STA $F4
-  
+   LDA #$04					;
+   JSR SetSquare2Frequency_F8EF			;
+
+   LDA #$06					;
+   STA Sound_Square2_SweepIndex			;
+
 CODE_FC69:
-   LDY $F4                  
+   LDY Sound_Square2_SweepIndex			;
    LDA DATA_F8FA-1,Y 				;load byte from table, that actually starts from legit opcode byte.
-   TAY
-   
-   LDX #$88                 
-   STX $4004                
-   JSR CODE_F96D                
-   BNE CODE_FC38
-   
-CODE_FC79:
-   STY $FB
-   
-   LDA #$1C                 
-   STA $F3
-   
-   LDA #$1C                 
-   LDX #$95
-   
-   LDY #$95                 
-   JSR CODE_F8EC
-   
-CODE_FC88:
-   LDA $F3                  
-   CMP #$17                 
-   BCC CODE_FC95                
-   BNE CODE_FC38
-   
-   LDA #$26                 
-   JSR CODE_F8EF
+   TAY						;
 
-CODE_FC95:  
-   LDY #$97
-   
-   LDA $F3                  
-   CMP #$0E                 
-   BCS CODE_FCA1                
- 
+   LDX #$88					;set duty & volume
+   STX APU_Square2DutyAndVolume			;??? this is pointless, because of the routine below
+   JSR SetSquare2DutyAndVolumeAndSweep_F96D	;
+   BNE ContinuePlayng_Sound_Effect_FC38		;
+
+;start playing Splash SFX
+InitSplashSFX_FC79:
+   STY Sound_Effect_Current			;
+
+   LDA #$1C					;
+   STA Sound_Effect_Length			;
+
+   LDA #$1C					;
+   LDX #$95					;
+   LDY #$95					;
+   JSR SetSquare2Regs_F8EC			;
+
+;continue playing Splash SFX
+PlaySplashSFX_FC88:
+   LDA Sound_Effect_Length			;
+   CMP #$17					;
+   BCC CODE_FC95				;
+   BNE ContinuePlayng_Sound_Effect_FC38		;
+
+   LDA #$26					;
+   JSR SetSquare2Frequency_F8EF			;
+
+CODE_FC95:
+   LDY #$97					;
+
+   LDA Sound_Effect_Length			;
+   CMP #$0E					;
+   BCS CODE_FCA1				;
+
 CODE_FC9D:
-   LSR A                    
-   ORA #$90                 
-   TAY
-   
-CODE_FCA1:
-   STY $4004                
-   JMP CODE_FC38                
-   
-CODE_FCA7:
-   LDY #$9A                 
-   LDA $F3                  
-   CMP #$14                 
-   BCS CODE_FCA1                
-   BCC CODE_FC9D
+   LSR A					;
+   ORA #$90					;
+   TAY						;
 
-CODE_FCB1:
+CODE_FCA1:
+   STY APU_Square2DutyAndVolume			;
+   JMP ContinuePlayng_Sound_Effect_FC38		;
+
+CODE_FCA7:
+   LDY #$9A					;
+   LDA Sound_Effect_Length			;
+   CMP #$14					;
+   BCS CODE_FCA1				;
+   BCC CODE_FC9D				;
+
+InitTimerSFX_FCB1:
    LDA #$08					;hold triangle wave for this long
    STA Sound_Loop_Timer_Length			;
 
-   LDA #$08					;length
-   STA $4008					;
+   LDA #$08					;yes, length
+   STA APU_TriangleLinearCounter		;
 
    LDA #Sound_Timer_BasePitch			;triangle pitch
-   STA $400A					;
+   STA APU_TriangleFrequency			;
 
-   LDA #$08					;frequency
-   STA $400B					;
+   LDA #$08					;the actual counter is set to the highest value so it doesn't interrupt the linear counter from before (also, no additional pitch modifier)
+   STA APU_TriangleFrequencyHigh		;
 
-CODE_FCC4:
+PlayTimerSFX_FCC4:
    DEC Sound_Loop_Timer_Length			;hold the same wave
-   JMP CODE_FD27				;continue with jingle bussiness
+   JMP HandleSound_Jingle_FD27			;continue with jingle bussiness
 
-CODE_FCC9:
-   LDA $F9					;if this flag is set, move onto jingles
-   BNE CODE_FD27				;
+HandleSound_Loop_FCC9:
+   LDA Sound_JingleTriangleTrackOffset		;if triangle is occupied by the jingle
+   BNE HandleSound_Jingle_FD27			;play jingle
 
    LDA Sound_Loop				;check looping sounds
    LSR A					;bits 0 and 1 are unused
    LSR A					;
 
    LDX Sound_Loop_Timer_Length			;already playing a looping sound? (bonus phase timer to be specific)
-   BNE CODE_FCC4				;
+   BNE PlayTimerSFX_FCC4			;
 
    LSR A					;
-   BCS CODE_FCB1				;init Sound_Loop_Timer
+   BCS InitTimerSFX_FCB1			;init Sound_Loop_Timer
 
    LSR A					;
-   BCS CODE_FCE3				;init Sound_Loop_Fireball
+   BCS InitFireballSFX_FCE3			;init Sound_Loop_Fireball
 
    LDX Sound_Loop_Fireball_Length		;fireball note timer
-   BNE CODE_FCF3				;init
-   JMP CODE_FD27				;onto jingles
+   BNE PlayFireballSFX_FCF3			;
+   JMP HandleSound_Jingle_FD27			;onto jingles
 
-CODE_FCE3:
+InitFireballSFX_FCE3:
    LDA #$0E					;timer or length, whichever is more correct i dont know
    STA Sound_Loop_Fireball_Length		;
 
    LDA #Sound_Fireball_BasePitch		;base triangle pitch
-   STA Sound_Loop_Fireball_Pitch		;
+   STA Sound_Loop_Fireball_Frequency		;
 
-   LDA #$08					;triangle frequency
-   STA $4008					;
+   LDA #$08					;
+   STA APU_TriangleLinearCounter		;how long the note is held for
    BNE CODE_FD0B				;
 
-CODE_FCF3:
+PlayFireballSFX_FCF3:
    DEC Sound_Loop_Fireball_Length		;
 
    LDA Sound_Loop_Fireball_Length		;check timer
    CMP #$08					;
    BCS CODE_FD0B				;for some time, it'll hold the same pitch
 
-   LDY Sound_Loop_Fireball_Pitch		;the sound will now "vibrate" by changing its pitch
-   JSR CODE_F974				;what actually happens is it hightens its base pitch every frame
-   STA Sound_Loop_Fireball_Pitch		;then, depending on timer and RNG, the output will be higher pitch or lower
+   LDY Sound_Loop_Fireball_Frequency		;the sound will now "vibrate" by changing its pitch (frequency)
+   JSR SubstractOne32nd_F974			;what actually happens is it hightens its base pitch every frame
+   STA Sound_Loop_Fireball_Frequency		;then, depending on timer and RNG, the output will be higher pitch or lower
 
    LDA Sound_Loop_Fireball_Length		;bits 0 or 1 enabled
    AND #$03					;
@@ -12133,315 +12206,379 @@ CODE_FD0B:
    LSR A					;
    BCC CODE_FD1A				;
 
-   LDA Sound_Loop_Fireball_Pitch		;this will produce higher pitch sound
+   LDA Sound_Loop_Fireball_Frequency		;this will produce higher pitch sound (short triangle)
    CLC						;
    ROL A					;
-   STA $400A					;
+   STA APU_TriangleFrequency			;
    BNE CODE_FD21				;
 
 CODE_FD1A:
-   LDA Sound_Loop_Fireball_Pitch		;this will produce lower pitch sound
+   LDA Sound_Loop_Fireball_Frequency		;this will produce lower pitch sound (long triangle)
    ROL A					;
    ROL A					;
-   STA $400A					;
+   STA APU_TriangleFrequency			;
 
-CODE_FD21:  
-   ROL A					;length counter
+CODE_FD21:
+   ROL A					;high byte of the period (the length of the sound)
    AND #$03					;
-   STA $400B					;
+   STA APU_TriangleFrequencyHigh		;
 
 ;Loop sound over, perform sweet sweet jingles
-CODE_FD27:
-   LDA Sound_Jingle				;
-   BNE CODE_FD33				;play jingle bells!
+HandleSound_Jingle_FD27:
+   LDA Sound_Jingle				;see if we should play some jingle/music
+   BNE InitJingle_FD33				;play jingle bells! (it's real, don't look it up)
 
-   LDA Sound_JinglePlayingFlag			;if the jingle is still playing, continue
-   BNE CODE_FD78				;
-   JMP CODE_FBEC				;otherwise play sound effects (they won't play during jingles)
+   LDA Sound_JinglePlayingFlag			;
+   BNE ProcessJingleSquare_FD78			;if the jingle is still playing, continue
+   JMP HandleSound_Effect_FBEC			;otherwise play sound effects (they won't play during jingles)
 
-CODE_FD33:
+InitJingle_FD33:
    LDY #$07					;
 
-CODE_FD35:   
-   ASL A					;get jingle bit
+CODE_FD35:
+   ASL A					;get jingle bit index
    BCS CODE_FD3B				;from highest to lowest
    DEY						;
    BNE CODE_FD35				;
-  
+
+;assume bit 0, GameStart
+
 CODE_FD3B:
    INC Sound_JinglePlayingFlag			;set flag to true
    STY Sound_CurrentJingleID			;
 
-   LDA DATA_FE64,Y				;get offset for sounds first
+   LDA JingleHeaders_FE64,Y			;get offset for sounds first
    TAY						;
-   
-   LDA DATA_FE64,Y				;
-   STA $068D					;
-   
-   LDA DATA_FE64+1,Y				;\note data pointer
-   STA $F7					;|
+
+   LDA JingleHeaders_FE64,Y			;
+   STA Sound_NoteLengthOffset			;
+
+   LDA JingleHeaders_FE64+1,Y			;\note data pointer (square 2 + maybe other channels, based on offset)
+   STA Sound_SoundDataPointer			;|
 						;|
-   LDA DATA_FE64+2,Y				;|
-   STA $F8					;/
+   LDA JingleHeaders_FE64+2,Y			;|
+   STA Sound_SoundDataPointer+1			;/
 
-   LDA DATA_FE64+3,Y
-   STA $F9
-   
-   LDA DATA_FE64+4,Y              
-   STA $FA
-   
-   LDA DATA_FE64+5,Y				;uhh, something???
-   STA $0686					;seems to be only used for Sound_Jingle_TitleScreen
-   
-   LDA #$01                 
-   STA $0695                
-   STA $0696                
-   STA $0698                
-   STA $069A
-   
-   LDY #$00                 
-   STY $0682
-  
-CODE_FD78:
-   LDY $FA                  
-   BEQ CODE_FDAF
-   
-   DEC $0696                
-   BNE CODE_FDAF                
-   INC $FA
-   
-   LDA ($F7),Y              
-   BEQ CODE_FDBE                
-   BPL CODE_FD95                
-   JSR CODE_F987
-   STA $0691
+   LDA JingleHeaders_FE64+3,Y			;play or don't play triangle
+   STA Sound_JingleTriangleTrackOffset		;
 
-   LDY $FA                  
-   INC $FA                  
-   LDA ($F7),Y
-  
+   LDA JingleHeaders_FE64+4,Y			;play or don't play square 1
+   STA Sound_JingleSquareTrackOffset		;
+
+   LDA JingleHeaders_FE64+5,Y			;play or don't play noise (doesn't matter unless we're playing Sound_Jingle_TitleScreen)
+   STA Sound_JingleNoiseTrackOffset		;
+
+   LDA #$01					;
+   STA Sound_Square2NoteLength			;play square 2
+   STA Sound_SquareNoteLength			;play square 1
+   STA Sound_TriangleNoteLength			;maybe play triangle
+   STA Sound_NoiseNoteLength			;maaaaaaaaaybe play noise, idk
+
+   LDY #$00					;init square 2 offset thing (ALL jingles utilize at least square 2 channel)
+   STY Sound_JingleSquare2TrackOffset		;
+
+ProcessJingleSquare_FD78:
+   LDY Sound_JingleSquareTrackOffset		;playing square?
+   BEQ CODE_FDAF				;if not, play something else maybe
+
+   DEC Sound_SquareNoteLength			;keep the same square sound for a while
+   BNE CODE_FDAF				;
+
+   INC Sound_JingleSquareTrackOffset		;next pulse (square) value
+
+   LDA (Sound_SoundDataPointer),Y		;
+   BEQ EndJingle_FDBE				;jingle stops completely once it reaches 0
+   BPL CODE_FD95				;if positive, keep the same timing, just change the beat
+
+   JSR ProcessLengthData_F987			;
+   STA Sound_SquareNoteLengthSaved		;change amount of time for square to play the beat
+
+   LDY Sound_JingleSquareTrackOffset		;
+   INC Sound_JingleSquareTrackOffset		;
+   LDA (Sound_SoundDataPointer),Y		;next square value
+
 CODE_FD95:
-   JSR CODE_F8D8                
-   BNE CODE_FD9E
-   
-   LDX #$10
-   BNE CODE_FDA6
-   
+   JSR SetSquare1Frequency_F8D8			;set frequency
+   BNE CODE_FD9E				;check if set frequency or not
+
+   LDX #$10					;essentially mutes square
+   BNE CODE_FDA6				;
+
 CODE_FD9E:
-   LDX #$06                 
-   LDA $F9                  
-   BNE CODE_FDA6
-   
-   LDX #$86
-  
+   LDX #$06					;pulse width = 12.5%
+   LDA Sound_JingleTriangleTrackOffset		;
+   BNE CODE_FDA6				;
+
+   LDX #$86					;pulse width = 50%
+
 CODE_FDA6:
-   JSR CODE_F8C6                
-   LDA $0691                
-   STA $0696
+   JSR SetSquare1DutyAndVolumeWithNoSweep_F8C6	;make sure there's no square sweep, set duty/volume with X input
 
-CODE_FDAF:  
-   DEC $0695                
-   BNE CODE_FE02                
-   LDY $0682                
-   INC $0682
+   LDA Sound_SquareNoteLengthSaved		;play the square note for this long
+   STA Sound_SquareNoteLength			;
 
-   LDA ($F7),Y              
-   BNE CODE_FDDA
-  
-CODE_FDBE:
-   JSR CODE_F8C2
+CODE_FDAF:
+   DEC Sound_Square2NoteLength			;if still playing the same square 2 note
+   BNE ProcessJingleTriangle_FE02		;check other channels, first stop - triangle
 
-;music over
-   LDA #$00                 
-   STA $FA                  
-   STA $F9                  
-   STA $F0                  
-   STA $FB                  
-   STA $06A2                
-   STA $06C0					;
-   STA $4008					;no more triangle
-   
-   LDA #$10					;constant volume for pulse
-   STA $4004					;
-   RTS
-  
-CODE_FDDA:
-   JSR CODE_F981                
-   STA $0695                
-   TXA                      
-   AND #$3E                 
-   JSR CODE_F8EF                
-   BEQ CODE_FE02
-   
+   LDY Sound_JingleSquare2TrackOffset		;
+   INC Sound_JingleSquare2TrackOffset		;square 2 value for next time
+
+   LDA (Sound_SoundDataPointer),Y		;reached the end of the jingle/song?
+   BNE ProcessJingleSquare2_FDDA		;if not, continue sound stuff
+
+;music/sfx over
+EndJingle_FDBE:
+   JSR MuteSquare1_F8C2				;square 1 BEGONE
+
+   LDA #$00					;
+   STA Sound_JingleSquareTrackOffset		;no square
+   STA Sound_JingleTriangleTrackOffset		;no triangle
+   STA Sound_Effect2_Current			;no SFX I guess
+   STA Sound_Effect_Current			;no SFX still
+   STA Sound_JinglePlayingFlag			;NOT playing jingle >:(
+   STA Sound_Loop_Fireball_Length		;even fireball sound-related thing is cleared
+   STA APU_TriangleLinearCounter		;no more triangle
+
+   LDA #$10					;constant volume for pulse (square), but no actual volume
+   STA APU_Square2DutyAndVolume			;
+   RTS						;
+
+ProcessJingleSquare2_FDDA:
+   JSR AlternateLengthHandler_F981		;calculate square 2 note length
+   STA Sound_Square2NoteLength			;
+   TXA						;
+   AND #$3E					;
+   JSR SetSquare2Frequency_F8EF			;and frequency
+   BEQ ProcessJingleTriangle_FE02		;if NO frequency, then actually don't play square 2 at the moment, move onto something else
+
    LDX #$9F					;set pulse (square) constant max volume
    LDA Sound_CurrentJingleID			;
    BEQ CODE_FDFA				;check if current jingle is Sound_Jingle_GameStart, if so, skip over
-   
-   LDX #$87                 
-   LDA $0695                
-   CMP #$10                 
-   BCS CODE_FDFA
-   
-   LDX #$84
-  
+
+   LDX #$87					;higher volume
+   LDA Sound_Square2NoteLength			;
+   CMP #$10					;
+   BCS CODE_FDFA				;
+
+   LDX #$84					;lower volume
+
 CODE_FDFA:
-   STX $4004
-   
-   LDA #$7F                 
-   STA $4005                
-   
-CODE_FE02:
-   LDY $F9                  
-   BEQ CODE_FE2D                
-   DEC $0698                
-   BNE CODE_FE2D                
-   INC $F9                  
-   LDA ($F7),Y
-   JSR CODE_F981
-   STA $0698
-   CLC                      
-   ADC #$FE                 
-   ASL A                    
-   ASL A                    
-   CMP #$38                 
-   BCC CODE_FE20
-   
-   LDA #$38
-  
+   STX APU_Square2DutyAndVolume			;
+
+   LDA #$7F					;sweep not activated
+   STA APU_Square2Sweep				;
+
+ProcessJingleTriangle_FE02:
+   LDY Sound_JingleTriangleTrackOffset		;check if the jingle is playing triangle channel
+   BEQ ProcessJingleNoise_FE2D			;if not, maaaaaaaaaaaaybe noise?
+
+   DEC Sound_TriangleNoteLength			;is triangle note still playing?
+   BNE ProcessJingleNoise_FE2D			;So be it
+
+   INC Sound_JingleTriangleTrackOffset		;
+
+   LDA (Sound_SoundDataPointer),Y		;
+   JSR AlternateLengthHandler_F981		;
+   STA Sound_TriangleNoteLength			;
+   CLC						;
+   ADC #$FE					;
+   ASL A					;
+   ASL A					;
+   CMP #$38					;must be below a certain threshold
+   BCC CODE_FE20				;
+
+   LDA #$38					;
+
 CODE_FE20:
    LDY Sound_CurrentJingleID			;check if current jingle is Sound_Jingle_GameStart
    BNE CODE_FE27				;if not, set triangle channel value from above
-   
+
    LDA #$FF					;max triangle settings
 
-CODE_FE27:   
-   STA $4008					;triangle stuff
+CODE_FE27:
+   STA APU_TriangleLinearCounter		;triangle stuff
 
-   JSR CODE_F8F3
-  
-CODE_FE2D:
-   LDA Sound_CurrentJingleID
-   CMP #$07					;Sound_Jingle_TitleScreen>>4 ?
-   BNE CODE_FE63
+   JSR SetTriangleFrequency_F8F3		;
 
-   DEC $069A                
-   BNE CODE_FE63
-   
-   LDY $0686                
-   INC $0686                
-   LDA ($F7),Y              
-   JSR CODE_F981                
-   STA $069A                
-   TXA                      
-   AND #$3E                 
-   BNE CODE_FE54
-   
-   LDA #$00                 
-   LDX #$02                 
-   LDY #$08                 
-   BNE CODE_FE5A
-  
+ProcessJingleNoise_FE2D:
+   LDA Sound_CurrentJingleID			;
+   CMP #$07					;LOG(Sound_Jingle_TitleScreen,2)
+   BNE CODE_FE63				;title screen is the only track that utilizes noise channel
+
+   DEC Sound_NoiseNoteLength			;just keep playing the note
+   BNE CODE_FE63				;
+
+   LDY Sound_JingleNoiseTrackOffset		;
+   INC Sound_JingleNoiseTrackOffset		;
+   LDA (Sound_SoundDataPointer),Y		;
+   JSR AlternateLengthHandler_F981		;alter length
+   STA Sound_NoiseNoteLength			;
+   TXA						;
+   AND #$3E					;
+   BNE CODE_FE54				;
+
+   LDA #$00					;
+   LDX #$02					;
+   LDY #$08					;
+   BNE StoreNoiseRegs_FE5A			;
+
 CODE_FE54:
-   LDA #$02                 
-   LDX #$00                 
-   LDY #$28
+   LDA #$02					;
+   LDX #$00					;
+   LDY #$28					;
 
-CODE_FE5A:  
-   STA $400C                
-   STX $400E                
-   STY $400F
+StoreNoiseRegs_FE5A:
+   STA APU_NoiseVolume				;
+   STX APU_NoiseLoop				;
+   STY APU_NoiseLength				;
 
-CODE_FE63:  
-   RTS                      
+CODE_FE63:
+   RTS						;
 
-DATA_FE64:
 ;first 8 bytes are offsets foreach Sound_Jingle entry
-.byte $08,$0D,$12,$17,$1C,$21,$26,$2B
+JingleHeaders_FE64:
+.byte GameStartSoundHeader-JingleHeaders_FE64
+.byte PhaseStartSoundHeader-JingleHeaders_FE64
+.byte PERFECTSoundHeader-JingleHeaders_FE64
+.byte PauseSoundHeader-JingleHeaders_FE64
+.byte PlayerReappearSoundHeader-JingleHeaders_FE64
+.byte CoinCountSoundHeader-JingleHeaders_FE64
+.byte GameOverSoundHeader-JingleHeaders_FE64
+.byte TitleScreenSoundHeader-JingleHeaders_FE64
 
-;if the format is the same as in SMB, it's as follows:
-;1 byte - length byte offset
-;2 bytes - sound data address
+;Each jingle has a header, with following format:
+;1 byte - note length lookup offset
+;2 bytes - sound data address, square 2 data
 ;1 byte - triangle data offset
 ;1 byte - square 1 data offset
-;1 byte - square 2 data offset (only for title screen?)
-.byte $0F,<DATA_FE95,>DATA_FE95,DATA_FEC5-DATA_FE95,$00
-.byte $00,<DATA_FED1,>DATA_FED1,$00,DATA_FED9-DATA_FED1
-.byte $00,<DATA_FEE6,>DATA_FEE6,DATA_FEF0-DATA_FEE6,$00
-.byte $0F,<DATA_FEF3,>DATA_FEF3,$00,$00
-.byte $07,<DATA_FEFC,>DATA_FEFC,DATA_FEFF-DATA_FEFC,$00
-.byte $00,<DATA_FF0B,>DATA_FF0B,$00,$00
-.byte $07,<DATA_FF0D,>DATA_FF0D,DATA_FF25-DATA_FF0D,$00
-.byte $16,<DATA_FF44,>DATA_FF44,DATA_FF63-DATA_FF44,DATA_FF7C-DATA_FF44,DATA_FFC2-DATA_FF44
+;1 byte - noise data offset, exclusively used for title theme, it's the only entry that is 6 bytes long, others only have 5
+
+;if sound channel data offset is 0, that channel won't be used. square 2 is used for all of the tracks.
+
+;has no triangle
+GameStartSoundHeader:
+.byte $0F
+.word GameStartSoundData_FE95
+.byte GameStartSquare1Data_FEC5-GameStartSoundData_FE95
+.byte $00
+
+;has no square 1
+PhaseStartSoundHeader:
+.byte $00
+.word PhaseStartSoundData_FED1
+.byte $00
+.byte PhaseStartTriangleData_FED9-PhaseStartSoundData_FED1
+
+PERFECTSoundHeader:
+.byte $00
+.word PERFECTSoundData_FEE6
+.byte PERFECTSquare1Data_FEF0-PERFECTSoundData_FEE6
+.byte $00
+
+;has neither square 1 or triangle, square 2 solo
+PauseSoundHeader:
+.byte $0F
+.word PauseSoundData_FEF3
+.byte $00
+.byte $00
+
+PlayerReappearSoundHeader:
+.byte $07
+.word PlayerReappearSoundData_FEFC
+.byte PlayerReappearSquare1Data_FEFF-PlayerReappearSoundData_FEFC
+.byte $00
+
+CoinCountSoundHeader:
+.byte $00
+.word CoinCountSoundData_FF0B
+.byte $00
+.byte $00
+
+GameOverSoundHeader:
+.byte $07
+.word GameOverSoundData_FF0D
+.byte GameOverSquare1Data_FF25-GameOverSoundData_FF0D
+.byte $00
+
+;all channels, including the elusive noise channel (no DMC though)
+TitleScreenSoundHeader:
+.byte $16
+.word TitleScreenSoundData_FF44
+.byte TitleScreenSquare1Data_FF63-TitleScreenSoundData_FF44
+.byte TitleScreenTriangleData_FF7C-TitleScreenSoundData_FF44
+.byte TitleScreenNoiseData_FFC2-TitleScreenSoundData_FF44
 
 ;$00 - stop command
-DATA_FE95:
+
+GameStartSoundData_FE95:
 .byte $5D,$78,$5D,$78,$5C,$78,$5C,$62
 .byte $E6,$65,$5E,$65,$5E,$64,$5E,$40
 .byte $5E,$F8,$00
 
-;Unused! a leftover from somewhere? maybe square sound? because with noise it doesnt sound good.
+;Unused! Lost jingle? A back and forth kind of sound (if applied to square channel)
 DATA_FEA8:
 .byte $85,$06,$81,$26,$85,$06,$81,$26
 .byte $06,$26,$06,$0E,$83,$12,$85,$10
 .byte $81,$0A,$85,$10,$81,$0A,$10,$0A
 .byte $2E,$0A,$83,$26,$00
 
-DATA_FEC5:
+GameStartSquare1Data_FEC5:
 .byte $5D,$78,$5D,$78,$1D,$5F,$40,$5F
 .byte $40,$9E,$80,$F8
 
-DATA_FED1:
+PhaseStartSoundData_FED1:
 .byte $6E,$6A,$A6,$A6,$A6,$AE,$07,$00
 
-DATA_FED9:
+PhaseStartTriangleData_FED9:
 .byte $82,$46,$38,$32,$4A,$48,$81,$40
 .byte $42,$44,$48,$84,$30
 
-DATA_FEE6:
+PERFECTSoundData_FEE6:
 .byte $66,$6E,$4A,$50,$52,$50,$4A,$6E
 .byte $27,$00
 
-DATA_FEF0:
+PERFECTSquare1Data_FEF0:
 .byte $E6,$DE,$39
 
-DATA_FEF3:
+PauseSoundData_FEF3:
 .byte $04,$12,$04,$12,$04,$12,$04,$D2
 .byte $00
 
-DATA_FEFC:
+PlayerReappearSoundData_FEFC:
 .byte $83,$83,$00
 
-DATA_FEFF:
+PlayerReappearSquare1Data_FEFF:
 .byte $46,$46,$4E,$52,$42,$4E,$12,$14
 .byte $16,$18,$1A,$05
 
-DATA_FF0B:
-.byte $E6,$00
+CoinCountSoundData_FF0B:
+.byte $E6,$00					;yep, it's just one square channel tone that goes down in volume
 
-DATA_FF0D:
+GameOverSoundData_FF0D:
 .byte $2E,$46,$02,$AE,$6A,$67,$28,$6A
 .byte $02,$A6,$64,$63,$9E,$A4,$6A,$47
 .byte $08,$4B,$02,$0C,$4F,$02,$07,$00
 
-DATA_FF25:
+GameOverSquare1Data_FF25:
 .byte $86,$A6,$A2,$9C,$AA,$A2,$9C,$BC
 .byte $9E,$BC,$B6,$B2,$26,$24,$26,$24
 .byte $A6,$22,$1E,$22,$1E,$A2,$1C,$00
 .byte $1C,$00,$1C,$00,$1C,$00,$1D
 
-DATA_FF44:
+TitleScreenSoundData_FF44:
 .byte $47,$EA,$42,$66,$AA,$AC,$6A,$A6
 .byte $47,$EA,$42,$66,$AA,$AC,$6A,$A6
 .byte $6A,$AC,$86,$6C,$AA,$6C,$86,$8A
 .byte $46,$4A,$4E,$D0,$D2,$11,$00
 
-DATA_FF63:
+TitleScreenSquare1Data_FF63:
 .byte $77,$76,$F6,$5D,$5C,$DC,$77,$76
 .byte $F6,$5D,$5C,$DC,$65,$64,$E4,$7F
 .byte $7E,$FE,$BE,$B6,$9C,$B8,$A4,$9C
 .byte $F6
 
-DATA_FF7C:
+TitleScreenTriangleData_FF7C:
 .byte $82,$2A,$81,$36,$82,$24,$81,$1C
 .byte $1E,$20,$22,$24,$1C,$26,$1C,$24
 .byte $1C,$22,$82,$2A,$81,$36,$82,$24
@@ -12452,7 +12589,7 @@ DATA_FF7C:
 .byte $0E,$06,$0A,$0E,$80,$2E,$86,$06
 .byte $82,$3A,$81,$3C,$84,$36
 
-DATA_FFC2:
+TitleScreenNoiseData_FFC2:
 .byte $40,$44,$44,$44,$40,$44,$40,$44
 .byte $40,$44,$44,$44,$40,$44,$40,$44
 .byte $40,$44,$44,$44,$40,$44,$40,$44

@@ -4,6 +4,9 @@
 
 ;RAM Adresses
 
+;$00-$07 - scratch RAM for various purposes
+;$08 - unused
+
 Reg2000BitStorage = $09				;contains bits to be enabled/disabled for register $2000
 Reg2001BitStorage = $0A				;contains bits to be enabled/disabled for register $2001
 
@@ -270,13 +273,22 @@ CurrentEntity_HitBoxWidth = CurrentEntity_Address+$1F
 
 ;Sound addresses
 Sound_Effect2_Current = $F0			;sound effect2 that is currently playing
+Sound_Effect2_Length = $F1			;\ticks down and controls the square's sweep bits (Squ1_SfxLenCounter in SMB)
+Sound_Square_Frequency = $F2			;/used by Sound_Effect2 sound (uses Square 1 channel)
+Sound_Square_SweepIndex = $F2			;used by enemy hit sound effects (EnemyKicked, EnemyDead, LastEnemyDead)
+Sound_Effect_Length = $F3			;
+Sound_Square2_Frequency = $F4			;
+Sound_Square2_SweepIndex = $F4			;used by certain sound effects as such
 Sound_Loop_Timer_Length = $F5			;how long the timer tick (TEST YOUR SKILL) sound is held for before replaying it
-Sound_Loop_Fireball_Pitch = $F6			;only used for fireball sound to produce variable sound
-Sound_MusicDataPointer = $F7			;2 bytes, indirect addressing
+Sound_Loop_Fireball_Frequency = $F6		;only used for fireball sound to produce variable sound
+Sound_SoundDataPointer = $F7			;2 bytes, indirect addressing (for jingles, maaaaybe for other sounds idk)
+Sound_JingleTriangleTrackOffset = $F9		;for fanfares that use triangle (00 - no triangle)
+Sound_JingleSquareTrackOffset = $FA		;for fanfares that use square (00 - no square)
+Sound_Effect_Current = $FB			;sSound_Effect that is currently playing
 
-;those are bitwise, each sound/sound is it's own bit.
+;these are bitwise, each sound bite is it's own bit.
 Sound_Base = Sound_Loop				;used as a base address for sound addresses 
-Sound_Loop = $FC				;some looping sounds/held note sound
+Sound_Loop = $FC				;some looping sounds/held note sound (use triangle channel)
 Sound_Jingle = $FD				;various jingles
 Sound_Effect = $FE				;sound effects
 Sound_Effect2 = $FF				;more sound effects
@@ -460,12 +472,36 @@ Entity_ComingOutofRightPipeFlag = $05FC		;is set when an entity is coming out of
 ;$05FE - ??
 ;$05FF - some sort of "disable control flag" that's set when players collide with each other?
 
+;Some sound engine RAM that doesn't fit into $F0-$FF range is stored here
+
+;$0600-$0681 - unused
+
+Sound_JingleSquare2TrackOffset = $0682
+;$0683-$0685 - unused
+Sound_JingleNoiseTrackOffset = $0686
+;$0687-$068C - unused
+Sound_NoteLengthOffset = $068D
+;$068E-$0690 - unused
+Sound_SquareNoteLengthSaved = $0691		;this address is used to store to Sound_SquareTimer, this can change for the next beat or stay the same for the same timing
+;$0692-$0694 - unused
+Sound_Square2NoteLength = $0695
+Sound_SquareNoteLength = $0696
+;$0697 is unused
+Sound_TriangleNoteLength = $0698		;time between each triangle beat
+;$0699 is Unused
+Sound_NoiseNoteLength = $069A
+;$069B-$06A1 - unused
 Sound_JinglePlayingFlag = $06A2			;indicates if there's a jingle playing at the moment
+;$06A3-$06B6 - unused
+Sound_PlayerDeadSFX_SweepIndex = $06B7		;used exclusively for Sound_Effect2_PlayerDead, acts as both the timer and index for square sweep values (so it produces a pulsating effect)
+;$06B8-$06BF - unused
 Sound_Loop_Fireball_Length = $06C0		;how long the fireball sound is held for
+;$06C1-$06EF - unused
 Sound_Effect2_Step_Counter = $06F0		;counts up each time #Sound_Effect2_Step starts playing, to give each step a different tone
 Sound_CurrentJingleID = $06F2			;indicates ID of the current jingle that's playing (detoned by bit number)
+;$06F3-$06FF - unused
 
-;$0700-$07FF - unused (these aren't even reset in a RAM clear loop)
+;$0700-$07FF - unused,  not cleared in the RAM clear loop
 
 ;OAM base ram addresses
 OAM_Y = $0200
@@ -521,13 +557,40 @@ VRAMRenderAreaReg = $2005			;write twice to point to to where the screen should 
 VRAMPointerReg = $2006				;write twice to point to address in VRAM to update
 VRAMUpdateRegister = $2007			;write value to update VRAM address with
 
-;sound regs are to be added...
+;this applies to all channels (except DMC (Delta Modulation Channel))
+APU_ChannelFrequency = $4002
+APU_ChannelFrequencyHigh = $4003
+
+APU_Square1DutyAndVolume = $4000		;bitwise DDLc vvvv, DD - Duty cycle (pulse width, the available values are 12.5%, 25%, 50% and 25% negated (basically the same?)), L - length counter halt (play sound indefinitely), c - constant volume/envelope (if clear, the volume goes down when the sound ends), v - volume bits, as you can imagine the higher it is, the louder it gets
+APU_Square1Sweep = $4001			;makes the sound "sweep" up or down its frequency (bitwise: EPPP NSSS, E - enable sweep, PPP - the divider's period (P+1 half-frames), N - negate flag, if clear, will sweep toward lower frequency, set - sweep toward higher frequency, SSS = shift count)
+APU_Square1Frequency = $4002
+APU_Square1FrequencyHigh = $4003		;first 3 bits are an extension to the above frequency thing, the rest are "Length counter load" bits, how long the sound will play (if L bit from APU_Square1DutyAndVolume isn't set)
+
+APU_Square2DutyAndVolume = $4004		;same for the second square channel
+APU_Square2Sweep = $4005
+APU_Square2Frequency = $4006
+APU_Square2FrequencyHigh = $4007
+
+APU_TriangleLinearCounter = $4008		;bit 7 halts linear counter for constant noise, otherwise the channel will silence itself after playing the sound, the rest of the bits are how long the sound will play, basically like length counter load bits, but more flexible? but also doesn't allow for longer timing
+;$4009 is unused for triangle
+APU_TriangleFrequency = $400A			;think of it like a pitch control/how "long" the triangle is. the lower value is, the higher pitch it'll be
+APU_TriangleFrequencyHigh = $400B		;first 3 bits are an extension to the above "pitch" thing, the rest are how long the sound will play  (in the context of the triangle channel, this is basically redundant, as there's already timer bits at APU_TriangleLinearCounter, the channel will be silenced once either reaches 0)
+
+APU_NoiseVolume = $400C				;--LC VVVV, L - length counter halt (play the sound indefinitely if set), c - constant volume/envelope (if clear, the volume goes down when the sound ends), V - volume
+;$400D is unused for noise
+APU_NoiseLoop = $400E				;bit 7 enables the loop, the bits 0 through 3 are the noise's period
+APU_NoiseLength = $400F				;same length counter load bits as previous channels, if length counter halt bit is clear, the noise will play for a certain amount of time
+
+APU_DMCFrequency = $4010
+APU_DMCLoadCounter = $4011			;like a timer for how long it runs, I guess? Like linear counter for other channels.... I THINK??? QUESTION MARK????????
+APU_DMCSampleAddress = $4012			;where in ROM is the sample we're playing, between $C000 to $FFFF
+APU_DMCSampleLength = $4013
 
 OAMDMA = $4014
 
-APU_SoundChannels = $4015
-ControllerReg = $4016
-APU_FrameCounter = $4017
+APU_SoundChannels = $4015			;used to enable channels (also, if read, returns some bit stuff, but it's not relevant here)
+ControllerReg = $4016				;$4016 - First controller, $4017 (read) - Second controller
+APU_FrameCounter = $4017			;(write) bit 6 can enable IRQ and bit 7 changes step mode (4 or 5 step sequence for envelope/sweep/length of sound channels (except DMC)). IRQ only triggers at the end of the 4-step sequence (bit 7 must be clear).
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Constants
@@ -565,7 +628,7 @@ Sound_Jingle_PERFECT = $04			;plays after "Test Your Skill" if got "perfect!!"
 Sound_Jingle_Pause = $08			;plays when pausing the game (and when gaining an extra life, apparently)
 Sound_Jingle_PlayerReappear = $10		;plays after lost life and appearing on a platform at the top of the screen
 Sound_Jingle_CoinCount = $20			;plays when counting coins after "Test Your Skill"
-Sound_Jingle_GameOver = $40			;silent?
+Sound_Jingle_GameOver = $40			;
 Sound_Jingle_TitleScreen = $80			;title screen theme
 
 ;$FE
@@ -583,9 +646,9 @@ Sound_Effect2_PlayerDead = $01
 Sound_Effect2_POWBump = $02
 Sound_Effect2_LastEnemyDead = $04		;after kicking last enemy
 Sound_Effect2_EnemyKicked = $08
-Sound_Effect2_EnemyHit = $10			;when hitting platform from below
+Sound_Effect2_EnemyBumped = $10			;when hitting platform from below
 Sound_Effect2_Jump = $20
-Sound_Effect2_Turning = $40
+Sound_Effect2_Skidding = $40			;player skid sound
 Sound_Effect2_Step = $80			;when player moves around, sound changes slightly every frame
 
 ;some sound values that can change the way sound effects, well, sound
