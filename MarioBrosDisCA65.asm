@@ -181,7 +181,7 @@ NMI_C07D:
 
    LDA #$00					;\OAM DMA
    STA OAMAddress				;|
-   LDA #$02					;|
+   LDA #>OAM_Y					;|
    STA OAMDMA					;/
 
    LDA NMI_FunctionsEnableFlag			;don't screw anything up and skip everything in case it occured during lag (that could lead to bugs mostly due to changes in scratch RAM)
@@ -191,8 +191,8 @@ NMI_C07D:
    JSR CODE_EE6A				;handles freezie's platform freezing
    JSR CODE_CCFF            			;handles buffered tile drawing
    JSR CODE_CA66            			;handle palette
-   JSR CODE_CE09            			;keep camera still
-   JSR CODE_CCC5            			;handle controllers
+   JSR UpdateCamera_CE09                                    ;keep camera still
+   JSR ReadControllers_CCC5            			;handle controllers
    JSR CODE_CAF7    				;handle entity timers and store tile values from their VRAM positions
 
    LDY #$01					;"Frame has passed" flag.
@@ -1280,12 +1280,12 @@ CODE_C647:
    BNE CODE_C62C				;if so, some kinda timer thing again. man they really want to check you winning
 
    JSR CODE_D6BA				;handle various states
-   JSR CODE_C785				;movement related
+   JSR HandleEntityMovement_C785                            ;movement related
    JSR Player_CalculateVRAMPosForBump_CC3F	;calculate player's VRAM position for bumpy action
    JSR CODE_DC75				;handle interaction with other entities (like enemies)
 
 CODE_C657:
-   JSR CODE_CBC4				;player graphics
+   JSR HandleEntityGraphics_CBC4                            ;player graphics
    JSR CODE_CBB6				;store current entity address values back into entity's actual addresses (CurrentEntity_Address->Entity_Address)
 
 CODE_C65D:
@@ -1451,13 +1451,13 @@ CODE_C73B:
    CMP #$05					;
    BCS CODE_C744				;
 
-   JSR CODE_C785				;handle movement
+   JSR HandleEntityMovement_C785                            ;handle movement
 
 CODE_C744:
    JSR CODE_CC73				;get VRAM position below this entity
 
 CODE_C747:
-   JSR CODE_CBC4				;entity drawing
+   JSR HandleEntityGraphics_CBC4                            ;entity drawing
 
    LDA CurrentEntity_ActiveFlag			;entity active?
    BEQ CODE_C758				;
@@ -1510,8 +1510,7 @@ CODE_C782:
    JMP EntityProcessingLoop_C686		;jump all the way back and run the next entity
 
 ;handle horizontal and vertical movement
-;MoveEntity_C785:
-CODE_C785:
+HandleEntityMovement_C785:
    LDA CurrentEntity_ID				;
    CMP #Entity_ID_Fighterfly			;check if fighterfly
    BNE CODE_C7B7				;
@@ -2434,15 +2433,15 @@ CODE_CBC3:
    RTS						;
 
 ;seems to be a general sprite GFX drawing routine
-CODE_CBC4:
+HandleEntityGraphics_CBC4:
    LDA CurrentEntity_ActiveFlag			;if current entity is non-existent
    BEQ CODE_CBC3				;don't draw
 
-   LDA #>DATA_F296				;load pointer table for graphics for current entity
-   STA $15
+   LDA #>DrawModeTileConfigurationPointers_F296             ;tile configurations for each draw mode
+   STA $15                                                  ;
 
-   LDA #<DATA_F296				;
-   STA $14					;
+   LDA #<DrawModeTileConfigurationPointers_F296             ;
+   STA $14                                                  ;
 
    LDA CurrentEntity_DrawMode			;get pointers to graphics depending on its draw mode
    JSR CODE_CC29				;
@@ -2454,15 +2453,15 @@ CODE_CBC4:
    LDX CurrentEntity_OAMOffset			;OAM offset
 
 CODE_CBDD:
-   LDA ($12),Y					;
-   BEQ CODE_CBE9				;check if it should animate with frame counter?
-   BPL CODE_CBE4				;if bit 7 is set, it'll animate slower (or faster, idk)
-   ASL A					;
+   LDA ($12),Y                                              ;
+   BEQ CODE_CBE9                                            ;non-zero values are used for tile flickering
+   BPL CODE_CBE4                                            ;
+   ASL A                                                    ;
 
 CODE_CBE4:
-   EOR FrameCounter				;
-   LSR A					;
-   BCS CODE_CC1D				;load different tiles
+   EOR FrameCounter                                         ;
+   LSR A                                                    ;
+   BCS CODE_CC1D                                            ;don't show frame
 
 CODE_CBE9:
    INY						;
@@ -2644,8 +2643,7 @@ CODE_CCC2:
    RTS						;
 
 ;Should be self-explanatory
-;ReadControllers_CCC5:
-CODE_CCC5:
+ReadControllers_CCC5:
    LDX #$01					;\prepare controller 2 for reading
    STX ControllerReg				;/
    DEX						;\
@@ -2695,10 +2693,10 @@ CODE_CCFF:
    LDA BufferDrawFlag				;flag for tile update
    BEQ CODE_CD42				;obviously don't do that if not set
 
-   LDA #<BufferAddr				;set buffer address as indirect address ($91)
+   LDA #<BufferAddr				;set buffer address as indirect address
    STA $00					;
 
-   LDA #>BufferAddr				;$05
+   LDA #>BufferAddr				;
    STA $01					;
 
    LDA Reg2000BitStorage			; 
@@ -2754,7 +2752,7 @@ CODE_CD42:
 ;$00 - Tile value, used to fill screen
 ;$01 - VRAM tile write placement, used to determine starting position for tile drawing
 ;$02 - used as position for attribute clearing, VRAM's position, high byte
-;$09 - uses previous stored PPU bits to enable almost everything, except of first 2 bits
+;Reg2000BitStorage - uses previous stored PPU bits to enable almost everything except bit 2
 ;PPU registers:
 ;$2000, $2002, $2006, $2007
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2901,7 +2899,7 @@ CODE_CDC4:
 
 CODE_CDDA:
    STA ControlBits				;
-   STA $09					;
+   STA Reg2000BitStorage			;
    PLA						;
    ASL A					;shift again
    BCC CODE_CDE6				;if carry was set by shifting bit 6 (which should trigger repeated write)
@@ -2938,30 +2936,32 @@ CODE_CE00:
    BNE CODE_CDC4				;do actual writing
 
 ;Restore camera position after messing with VRAM
-CODE_CE09:
-   PHA
-   LDA CameraPosX				;restore camera position
-   STA VRAMRenderAreaReg			;
+UpdateCamera_CE09:
+   PHA                                                      ;
+   LDA CameraPosX                                           ;restore camera position
+   STA VRAMRenderAreaReg                                    ;
+   
+   LDA CameraPosY                                           ;
+   STA VRAMRenderAreaReg                                    ;
+   PLA                                                      ;
+   RTS                                                      ;
 
-   LDA CameraPosY				;
-   STA VRAMRenderAreaReg			;
-   PLA						;
-   RTS						;
+TransferToOAM_CE16:
+   LDA #<OAM_Y                                              ;set up address we're copying data to      
+   STA $03                                                  ;
 
-CODE_CE16:
-   LDA #$00					;set up address we're copying data to      
-   STA $03					;
+   LDA #>OAM_Y                                              ;it's OAM data, starting from first slot
+   STA $04                                                  ;
 
-   LDA #$02					;it's OAM data, starting from first slot
-   STA $04					;
-
-   LDY $02					;load offset
-   DEY						;-1
-   LDX $02					;load amount of bytes to copy
+   LDY $02                                                  ;load offset
+   DEY                                                      ;-1
+   LDX $02                                                  ;load amount of bytes to copy
 
 ;this routine is used to copy data from one area of addresses to another (from ROM to RAM or RAM to RAM)
-;there's only a single JSR for this.
-
+;$00 - pointer to address to transfer from
+;$02 - amount of bytes to transfer
+;$03 - pointer to transfer to
+;only used for OAM transfer (see above)
 CODE_CE23:
    LDA ($00),Y					;
    STA ($03),Y					;
@@ -2972,8 +2972,7 @@ CODE_CE23:
 
 ;Set up buffered write.
 ;Used by things such as POW block and score updates.
-
-CODE_CE2C:
+WriteScreenUpdateToBuffer_CE2C:
    LDA #$01					;enable drawing for various tiles (in NMI via buffer)
    STA BufferDrawFlag				;
 
@@ -2982,7 +2981,7 @@ CODE_CE2C:
    AND #$0F					;
    STA $05					;
 
-   LDA ($02),Y					;number of rows to update        
+   LDA ($02),Y					;number of rows to update
    LSR A					;
    LSR A					;
    LSR A					;
@@ -3013,11 +3012,11 @@ CODE_CE5A:
    LDA ($02),Y					;
    STA BufferAddr,X				;
 
-   DEC $06					;keep looping untill all bytes are in the buffer  
+   DEC $06					;keep looping untill all bytes are in the buffer
    BNE CODE_CE5A				;
    JSR NextVRAMUpdateIndex_CE84			;
-
    STX BufferOffset				;store current buffer offset
+
    CLC						;
    LDA #$20					;add + $20 to the VRAM position, so it's the next row
    ADC $00					;
@@ -3495,7 +3494,7 @@ CODE_D0B3:
 ;A - score address offset, where 0 - mario and 1 - luigi
 
 CODE_D0B4:
-   AND #$07					;does that mean that theoratically you can have more than 2 player scores? i don't know what ninty game allows for more than 2 and uses this same routine
+   AND #$07					;does this mean that theoratically you can have more than 2 player scores? i don't know what ninty game allows for more than 2 and uses this same routine
    ASL A					;
    ASL A					;x4 to get correct score address
    TAX						;into X
@@ -3522,7 +3521,7 @@ CODE_D0C1:
    JSR CounterAddition_D139			;
    STA PlayerScore+1,X				;result
 
-   LDA PlayerScore,X				;and tens and ones
+   LDA PlayerScore,X				;tens thousands and hundred thousands
    STA $03					;
 
    LDA $05					;calculate tens and hundreds of thousands
@@ -3637,30 +3636,30 @@ CODE_D155:
 ;A - result
 ;Carry - if next calculation in this routine should have a -1 to the low digit
 CounterSubstraction_D15A:
-CODE_D15A:
    JSR ExtractDigits_D17C			;extract digits
    SBC $01					;
    STA $01					;minus itself?
-   BCS CODE_D16D
-   ADC #$0A                 
-   STA $01
+   BCS CODE_D16D                                            ;
+   ADC #$0A                                                 ;decimal-ize, 10-1 = 9, not F
+   STA $01                                                  ;
    
-   LDA $02                  
-   ADC #$0F                 
-   STA $02
+   LDA $02                                                  ;
+   ADC #$0F                                                 ;
+   STA $02                                                  ;
 
 CODE_D16D:
-   LDA $03                  
-   AND #$F0                 
-   SEC                      
-   SBC $02                  
-   BCS CODE_D179                
-   ADC #$A0                 
-   CLC
+   LDA $03                                                  ;
+   AND #$F0                                                 ;
+   SEC                                                      ;
+   SBC $02                                                  ;
+   BCS CODE_D179                                            ;
+   
+   ADC #$A0                                                 ;same decimal operation with high nibble
+   CLC                                                      ;
 
-CODE_D179:   
-   ORA $01                  
-   RTS                      
+CODE_D179:
+   ORA $01                                                  ;
+   RTS                                                      ;
 
 ;extract two digits into two bytes
 ;Input:
@@ -3686,8 +3685,8 @@ ExtractDigits_D17C:
 UpdateTOPScore_D18B:
    LDA #$00				;
    STA $04				;
-   CLC					;
 
+   CLC					;
    LDA $00				;the amount of high scores?
    ADC #$10				;$F0+$10 = $00, indicating 1 TOP score on screen
    AND #$F0				;
@@ -3895,7 +3894,7 @@ CODE_D27F:
    LDA #>BufferOffset2				;$05
    STA $03					;
 
-   JSR CODE_CE2C				;stuff into an actual buffer
+   JSR WriteScreenUpdateToBuffer_CE2C				;stuff into an actual buffer
    RTS						;
 
 ;restore platform tiles after the bump animation has ended
@@ -4189,15 +4188,15 @@ CODE_D40B:
    LDA #$01					;makes cursor move when select is pressed (not held)
    STA TitleScreen_SelectHeldFlag		;
 
-   LDA #<DATA_F689				;setup for cursor sprite
-   STA $00					;
+   LDA #<TitleScreenCursorOAMData_F689                      ;setup for cursor sprite
+   STA $00                                                  ;
 
-   LDA #>DATA_F689				;set-up location to get cursor's OAM data
-   STA $01					;it's DATA_F689
+   LDA #>TitleScreenCursorOAMData_F689                      ;set-up location to get cursor's OAM data
+   STA $01                                                  ;
 
-   LDA #$04					;4 bytes to transfer
-   STA $02					;
-   JSR CODE_CE16				;
+   LDA #$04                                                 ;4 bytes to transfer
+   STA $02                                                  ;
+   JSR TransferToOAM_CE16                                   ;
 
    INC NonGameplayMode				;next pointer (show title screen)
 
@@ -4511,7 +4510,7 @@ CODE_D593:
 
    LDA $15					;
    STA $03					;
-   JMP CODE_CE2C				;draw POW block (or the lack of it)
+   JMP WriteScreenUpdateToBuffer_CE2C				;draw POW block (or the lack of it)
 
 ;This routine draws HUD during phase initialization (not the score values)
 CODE_D5BE:
@@ -6670,7 +6669,7 @@ CODE_E049:
 CODE_E051:
    STX $02					;
    STY $03					;
-   JMP CODE_CE2C				;
+   JMP WriteScreenUpdateToBuffer_CE2C				;
 
 CODE_E058:
    LDA Player2TriggerGameOverFlag		;show game over string?
@@ -6699,7 +6698,7 @@ CODE_E06D:
 CODE_E077:
    RTS						;
 
-;Strings, use row format (CODE_CE2C)
+;Strings, use row format (WriteScreenUpdateToBuffer_CE2C)
 ;first byte is the length of string(s) in low nibble, and high nibble is number of rows (strings) to draw, by default it's always 1 row
 
 ;MARIO GAME OVER
@@ -6740,21 +6739,21 @@ EmptyString_E0A8:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 CODE_E0B8:
-   LDA #$03				;set-up range for ram clean-up
-   STA $01				;
+   LDA #$03					;set-up range for ram clean-up
+   STA $01					;
 
-   LDA #$00 				;
-   STA $00				;
-   TAY					;
-   JSR CODE_CA35			;first clear $0300-$03FF
+   LDA #$00 					;
+   STA $00					;
+   TAY						;
+   JSR CODE_CA35				;first clear $0300-$03FF
 
-   LDA #$04				;then set-up range and clear $0400-$04FF
-   STA $01				;
+   LDA #$04					;then set-up range and clear $0400-$04FF
+   STA $01					;
 
-   LDA #$00				;
-   STA $00				;
-   TAY					;
-   JMP CODE_CA35			;
+   LDA #$00					;
+   STA $00					;
+   TAY						;
+   JMP CODE_CA35				;
 
 ;this table is used to set certain properties on phase load - enemy level, if it's a TEST YOUR SKILL phase and so on
 ;For what enemies spawn per enemy level, see DATA_F3BA
@@ -6781,7 +6780,7 @@ DATA_E0D0:
 .byte $07,$03,$02,$01
 .byte $08,$03,$02,$02
 .byte $09,$03,$02,$02
-.byte $AA,$04,$15					;from this phase, timer is set to 15 sec (although it shows 20 for a few frames, before snapping to the intended value)
+.byte $AA,$04,$15				;from this phase, timer is set to 15 sec (although it shows 20 for a few frames, before snapping to the intended value)
 
 .byte $0A,$03,$03,$02
 .byte $07,$03,$03,$02
@@ -7287,7 +7286,7 @@ CODE_E374:
 
    LDA #>BufferOffset2				;        
    STA $03					;
-   JSR CODE_CE2C				;store into main buffer
+   JSR WriteScreenUpdateToBuffer_CE2C				;store into main buffer
 
 ;animate coins in TEST YOUR SKILL bonus
 CODE_E3AE:
@@ -7329,7 +7328,7 @@ CODE_E3C7:
    JSR UpdateEntityGFXFrame_WhenGrounded_CE95	;animate (I guess the floating coins are considered to be "grounded")
 
 CODE_E3DD:
-   JSR CODE_CBC4				;update graphical display
+   JSR HandleEntityGraphics_CBC4                            ;update graphical display
 
 CODE_E3E0:
    JSR CODE_CBB6				;next entity plz
@@ -7501,7 +7500,7 @@ CODE_E4CD:
 
    LDA #$22					;
    STA $01					;
-   JSR CODE_CE2C				;draw the message
+   JSR WriteScreenUpdateToBuffer_CE2C				;draw the message
 
    LDA $1E					;
    STA $00					;
@@ -7542,7 +7541,7 @@ CODE_E506:
    STX $02					;
    STY $03					;
    
-   JSR CODE_CE2C				;stuff that into buffer
+   JSR WriteScreenUpdateToBuffer_CE2C				;stuff that into buffer
 
    LDA #$10					;time for transition
    JMP CODE_E1EC				;
@@ -7571,7 +7570,7 @@ CODE_E530:
    STA $01					;
    STX $02					;
    STY $03					;
-   JSR CODE_CE2C				;buffer
+   JSR WriteScreenUpdateToBuffer_CE2C				;buffer
 
    LDX $1E					;player sprite tile table offset
    LDY #6*4-1					;amount of sprite tiles player sprite tiles (6 tiles, 4 bytes each and 0 counts)
@@ -7799,7 +7798,7 @@ CODE_E67B:
    LDA #>DATA_E703				;$E7                 
    STA $03
 
-   JSR CODE_CE2C
+   JSR WriteScreenUpdateToBuffer_CE2C
 
    LDA #$00					;
    STA $04					;
@@ -9645,15 +9644,15 @@ WavyFireball_SpawnYPos_F0A1:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 DATA_F0A5:
-.byte $20,$83				;location to write to
-.byte $02				;amount of bytes to write in line
-.byte $76,$7A				;tiles to write
+.byte $20,$83					;location to write to
+.byte $02					;amount of bytes to write in line
+.byte $76,$7A					;tiles to write
 
-.byte $20,$A3				;next location
-.byte $02				;amount of tiles
-.byte $77,$79				;tiles
+.byte $20,$A3					;next location
+.byte $02					;amount of tiles
+.byte $77,$79					;tiles
 
-.byte $20,$9A				;etc.
+.byte $20,$9A					;etc.
 .byte $02
 .byte $7C,$7E
 
@@ -9694,13 +9693,13 @@ DATA_F0A5:
 .byte $89
 
 .byte $20,$C3
-.byte $19				;this time we write 25 tiles in a row
+.byte $19					;this time we write 25 tiles in a row
 .byte $78,$24,$24,$68,$69,$69,$6B,$69,$68
 .byte $69,$68,$6B,$69,$24,$68,$69,$68
 .byte $69,$6B,$69,$6B,$69,$24,$24,$88
 
 .byte $20,$E6
-.byte $13				;this time 19 tiles
+.byte $13					;this time 19 tiles
 .byte $68,$6A,$6A,$6E,$6A
 .byte $68,$6A,$68,$6E,$6A,$24,$68,$6A
 .byte $68,$6A,$6E,$6A,$6E,$71
@@ -9905,7 +9904,7 @@ DATA_F276:
 .byte $08
 .byte $5A,$AA,$AA,$00,$00,$AA,$AA,$5A
 
-.byte VRAMWriteCommand_Stop		;stop write
+.byte VRAMWriteCommand_Stop			;stop write
 
 ;attributes used for ledge tile 95
 DATA_F286:
@@ -9919,42 +9918,63 @@ DATA_F286:
 
 .byte VRAMWriteCommand_Stop
 
-;graphic pointers for every entity in game
-DATA_F296:
-.word DATA_F2A6				;$A6,$F2	;mario
-.word DATA_F2B9				;$B9,$F2
-.word DATA_F2C6				;$C6,$F2
-.word DATA_F2C6				;$C6,$F2
-.word DATA_F2D0				;$D0,$F2
-.word DATA_F2DA				;$DA,$F2
-.word DATA_F2E1				;$E1,$F2
-.word DATA_F2E8				;$E8,$F2
+DrawModeTileConfigurationPointers_F296:
+.word DrawModeTileConfig_16x24_F2A6
+.word DrawModeTileConfig_16x16_F2B9
+.word DrawModeTileConfig_8x16_FlickerTop_F2C6
+.word DrawModeTileConfig_8x16_FlickerTop_F2C6
+.word DrawModeTileConfig_8x16_FlickerBottom_F2D0
+.word DrawModeTileConfig_8x16_F2DA
+.word DrawModeTileConfig_8x16_TopShift_F2E1
+.word DrawModeTileConfig_8x8_F2E8
 
-DATA_F2A6:
-.byte $00,$EF,$F8,$00,$EF,$00,$00,$F7
-.byte $F8,$00,$F7,$00,$00,$00,$F8,$00
-.byte $00,$00,$AA
+;each entry is three bytes long:
+;first byte - flicker handling. $80 - even frames, $01 - odd frames, $00 - tile won't flicker
+;second byte - tile x-disposition relative to entity
+;third byte - tile y-disposition relative to entity
+;table ends with $AA
 
-DATA_F2B9:
-.byte $00,$F7,$F8,$00,$F7,$00,$00,$00
-.byte $F8,$00,$00,$00,$AA
+DrawModeTileConfig_16x24_F2A6:
+.byte $00,$EF,$F8
+.byte $00,$EF,$00
+.byte $00,$F7,$F8
+.byte $00,$F7,$00
+.byte $00,$00,$F8
+.byte $00,$00,$00
+.byte $AA
 
-DATA_F2C6:
-.byte $80,$F7,$F8,$01,$F7,$00,$00,$00
-.byte $FC,$AA
+DrawModeTileConfig_16x16_F2B9:
+.byte $00,$F7,$F8
+.byte $00,$F7,$00
+.byte $00,$00,$F8
+.byte $00,$00,$00
+.byte $AA
 
-DATA_F2D0:
-.byte $00,$F7,$FC,$80,$00,$F8,$01,$00
-.byte $00,$AA
+DrawModeTileConfig_8x16_FlickerTop_F2C6:
+.byte $80,$F7,$F8
+.byte $01,$F7,$00
+.byte $00,$00,$FC
+.byte $AA
 
-DATA_F2DA:
-.byte $00,$F7,$FC,$00,$00,$FC,$AA
+DrawModeTileConfig_8x16_FlickerBottom_F2D0:
+.byte $00,$F7,$FC
+.byte $80,$00,$F8
+.byte $01,$00,$00
+.byte $AA
 
-DATA_F2E1:
-.byte $00,$F7,$F8,$00,$00,$FC,$AA
+DrawModeTileConfig_8x16_F2DA:
+.byte $00,$F7,$FC
+.byte $00,$00,$FC
+.byte $AA
 
-DATA_F2E8:
-.byte $00,$FC,$FC,$AA
+DrawModeTileConfig_8x16_TopShift_F2E1:
+.byte $00,$F7,$F8
+.byte $00,$00,$FC
+.byte $AA
+
+DrawModeTileConfig_8x8_F2E8:
+.byte $00,$FC,$FC
+.byte $AA
 
 ;this table contains various initial props and such for Player entities
 SpawnInitValues_Players_F2EC:
@@ -10124,7 +10144,7 @@ SidestepperXMovementData:
   .byte $01,$01,$FF
   .byte $01,$01,$00
   .byte $01,$01,$00
-  .byte $01,$01,$01			;third byte = actutally speed up instead of slowing down every now and then
+  .byte $01,$01,$01				;third byte = actutally speed up instead of slowing down every now and then
 .else
   .byte $01,$01,$FF
   .byte $01,$01,$00
@@ -10163,7 +10183,7 @@ DATA_F3D2:
   .byte $12,$00
   .byte $1F,$00
 .else
-  .byte $04,$00				;yes, spawning times are also different in PAL version
+  .byte $04,$00					;yes, spawning times are also different in PAL version
   .byte $0E,$00
   .byte $19,$00
 .endif
@@ -10500,7 +10520,7 @@ SidestepperWalkAnimCycle:
 
 ;Sidestepper Movement (hit once)
 SidestepperAngryWalkAnimCycle:
-.byte GFX_Sidestepper_AngryMove1				;GFX_AnimationCycle_SidestepperAngry = $1A
+.byte GFX_Sidestepper_AngryMove1
 .byte GFX_Sidestepper_AngryMove1
 .byte GFX_Sidestepper_AngryMove2
 .byte GFX_Sidestepper_AngryMove2
@@ -10901,19 +10921,19 @@ DATA_F64D:
 ;this is used for HUD (player 1 and TOP prefixes)
 DATA_F660:
 .byte $20,$63
-.byte $01				;1 tile
-.byte $2A				;I- (first player score)
+.byte $01					;1 tile
+.byte $2A					;I- (first player score)
 
 .byte $20,$6B
 .byte $03
-.byte $2B,$2C,$2D			;TOP-
-.byte VRAMWriteCommand_Stop		;stop
+.byte $2B,$2C,$2D				;TOP-
+.byte VRAMWriteCommand_Stop			;stop
 
 ;this is also for HUD, for player 2, if applicable
 DATA_F66B:
 .byte $20,$75
 .byte $02
-.byte $29,$2A				;II-
+.byte $29,$2A					;II-
 .byte VRAMWriteCommand_Stop
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -10927,21 +10947,21 @@ DATA_F66B:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 InitLivesData_F671:
-.byte $F4,Lives_Tile,$00,$40				;\
-.byte $F4,Lives_Tile,$00,$4C				;|mario lives
-.byte $F4,Lives_Tile,$00,$58				;/
-.byte $F4,Lives_Tile,$01,$A8				;\
-.byte $F4,Lives_Tile,$01,$B4				;|luigi lives
-.byte $F4,Lives_Tile,$01,$C0				;/
+.byte $F4,Lives_Tile,$00,$40			;\
+.byte $F4,Lives_Tile,$00,$4C			;|mario lives
+.byte $F4,Lives_Tile,$00,$58			;/
+.byte $F4,Lives_Tile,$01,$A8			;\
+.byte $F4,Lives_Tile,$01,$B4			;|luigi lives
+.byte $F4,Lives_Tile,$01,$C0			;/
 
 ;Title screen cursor OAM data, same format as above, Y-position is also overwritten.
-DATA_F689:
+TitleScreenCursorOAMData_F689:
 .byte $F4,Cursor_Tile,$00,Cursor_XPos
 
 ;VRAM locations for score counters
 ScoreVRAMUpdData_F68D:
 .byte >VRAMLoc_TOPScore,<VRAMLoc_TOPScore
-.byte $06						;oh, and length ofc
+.byte $06					;oh, and length ofc
 .byte $00
 
 .byte >VRAMLoc_Player1Score,<VRAMLoc_Player1Score
@@ -10954,10 +10974,10 @@ ScoreVRAMUpdData_F68D:
 
 ;initial values for respawn platforms
 DATA_F699:
-.byte $10,RespawnPlatform_Tile1,$03,$6C			;\mario's platform
-.byte $10,RespawnPlatform_Tile1,$43,$73			;/
-.byte $10,RespawnPlatform_Tile1,$03,$84			;\luigi's platform
-.byte $10,RespawnPlatform_Tile1,$43,$8B			;/
+.byte $10,RespawnPlatform_Tile1,$03,$6C		;\mario's platform
+.byte $10,RespawnPlatform_Tile1,$43,$73		;/
+.byte $10,RespawnPlatform_Tile1,$03,$84		;\luigi's platform
+.byte $10,RespawnPlatform_Tile1,$43,$8B		;/
 
 ;for bouncing upon death
 PlayerDeathYSpeeds_F6A9:
@@ -11021,14 +11041,14 @@ PhaseString:
 .byte $22,$4C
 .byte @StringEnd-@StringStart
 @StringStart:
-	.byte "PHASE   "				;PHASE    (last 2 spaces are replaced with appropriate digits depending on phase number)
+	.byte "PHASE   "			;PHASE    (last 2 spaces are replaced with appropriate digits depending on phase number)
 @StringEnd:
 
 PEqualsString:
 .byte $23,$41
 .byte @StringEnd-@StringStart
 @StringStart:
-	.byte "P=  "					;P=   (same as above, spaces replaced with phase number digits)
+	.byte "P=  "				;P=   (same as above, spaces replaced with phase number digits)
 @StringEnd:
 .byte VRAMWriteCommand_Stop
 
@@ -11044,15 +11064,15 @@ DATA_F735:
 ;then timer initialization
 .byte $20,$8D
 .byte $06
-.byte $30,$31,$31,$31,$31,$32				;top border
+.byte $30,$31,$31,$31,$31,$32			;top border
 
 .byte $20,$AD
-.byte $06						;|20.0| (changes to 15.0 afterwads if in later TEST YOUR SKILL phases)
+.byte $06					;|20.0| (changes to 15.0 afterwads if in later TEST YOUR SKILL phases)
 .byte $33,"20",DecimalSeparator,"0",$34
 
 .byte $20,$CD
 .byte $06
-.byte $35,$36,$36,$36,$36,$37				;bottom border
+.byte $35,$36,$36,$36,$36,$37			;bottom border
 .byte VRAMWriteCommand_Stop
 
 ;data for Freezie's platform freezing (replacing tiles, attributes)
@@ -11216,7 +11236,7 @@ KickedEnemyXAndYSpeeds_F7E9:
 .byte $04,$00
 .byte $04,$01
 .byte $04,$01
-.byte $AA    				;will just fall down from now on       
+.byte $AA    					;will just fall down from now on       
 
 DATA_F81C:
 .byte $00,$01,$02,$02,$01,$00,$AA
@@ -11468,7 +11488,7 @@ SubstractHalf_F979:
    LSR A					;
    STA $00					;
 
-;base value minus the divided one (either base-(1/2), base-(1/4) or base-(1/32))
+;base value minus the divided one (either base-(base/2), base-(base/4) or base-(base/32))
    TYA						;
    SEC						;
    SBC $00					;output A
@@ -11700,13 +11720,13 @@ HandleSound_Effect2_FA91:
    BCS Long_PlayPlayerDeadSFX_FA8B		;continue playing Sound_Effect2_PlayerDead
 
    LSR Sound_Effect2				;
-   BCS Long_InitPlayerDeadSFX_FA88		;init sound Sound_Effect2_PlayerDead
+   BCS Long_InitPlayerDeadSFX_FA88		;init Sound_Effect2_PlayerDead
 
    LSR A					;
    BCS PlayPOWBumpSFX_FA2D			;continue playing Sound_Effect2_POWBump
 
    LSR Sound_Effect2				;
-   BCS Long_InitPOWBumpSFX_FA8E			;init sound Sound_Effect2_POWBump
+   BCS Long_InitPOWBumpSFX_FA8E			;init Sound_Effect2_POWBump
 
    LSR A					;
    BCS PlayLastEnemyDeadSFX_FA44		;continue playing Sound_Effect2_LastEnemyDead
@@ -12358,7 +12378,7 @@ ProcessJingleSquare2_FDDA:
 
    LDX #$87					;higher volume
    LDA Sound_Square2NoteLength			;
-   CMP #$10					;
+   CMP #$10					;the note will go out in volume after a certain amount of time has passed (without relying on built-in volume fade)
    BCS CODE_FDFA				;
 
    LDX #$84					;lower volume

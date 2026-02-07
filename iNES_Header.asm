@@ -1,5 +1,5 @@
 MAPPER = 0					;which mapper it's using (NROM)
-MIRRORING = 1					;vertical mirroring (supposedly)
+MIRRORING = 0					;horizontal mirroring (I had it on vertical all this time because the ROM I had it set to vertical, Mesen emulator autocorrected it to be horizontal. as it should be)
 
 .if Version = PAL
   REGION = 1					;obviously the TV system is PAL for PAL version

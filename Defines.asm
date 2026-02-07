@@ -281,10 +281,10 @@ Sound_Square2_Frequency = $F4			;
 Sound_Square2_SweepIndex = $F4			;used by certain sound effects as such
 Sound_Loop_Timer_Length = $F5			;how long the timer tick (TEST YOUR SKILL) sound is held for before replaying it
 Sound_Loop_Fireball_Frequency = $F6		;only used for fireball sound to produce variable sound
-Sound_SoundDataPointer = $F7			;2 bytes, indirect addressing (for jingles, maaaaybe for other sounds idk)
+Sound_SoundDataPointer = $F7			;2 bytes, indirect addressing (for jingles)
 Sound_JingleTriangleTrackOffset = $F9		;for fanfares that use triangle (00 - no triangle)
 Sound_JingleSquareTrackOffset = $FA		;for fanfares that use square (00 - no square)
-Sound_Effect_Current = $FB			;sSound_Effect that is currently playing
+Sound_Effect_Current = $FB			;Sound_Effect that is currently playing
 
 ;these are bitwise, each sound bite is it's own bit.
 Sound_Base = Sound_Loop				;used as a base address for sound addresses 
@@ -683,14 +683,14 @@ SplashAnimCycle_Start = SplashAnimCycle-EntityMovementAnimations_F4B2
 FireballMovementAnimCycle_Start = FireballMovementAnimCycle-EntityMovementAnimations_F4B2
 
 ;$B5
-Entity_Draw_16x24 = 0				;used by mario and luigi
-Entity_Draw_16x16 = 1				;used by coin effect (kinda popping effect that looks 16x16) and players when squished
-Entity_Draw_8x16_AnimFlicker = 2		;this is used by by sidestepper, top tile flickers (what is this used by now that I think about it...)
-Entity_Draw_8x16_FlickerTop = 3			;used by sidesteppers and fighterflies, they change top tile position every frame.
-Entity_Draw_8x16_FlickerBottom = 4		;used by sidesteppers and fighterflies when flipped over, same as above, but it's the bottom tile that flickers
-Entity_Draw_8x16 = 5				;8x16. used by coins, freezies and other effects
-Entity_Draw_8x16_Shift = 6			;8x16 but the top tile is slightly shifted horizontally. used by Shellcreepers
-Entity_Draw_8x8 = 7				;should be obvious, used for fireballs and various effects
+Entity_Draw_16x24 = 0                                       ;used by mario and luigi
+Entity_Draw_16x16 = 1                                       ;used by coin effect (kinda popping effect that looks 16x16) and players when squished
+Entity_Draw_8x16_FlickerTopDupe = 2                         ;appears to be identical to the below value that appears to be used frequently
+Entity_Draw_8x16_FlickerTop = 3                             ;used by sidesteppers and fighterflies, they change top tile position every frame.
+Entity_Draw_8x16_FlickerBottom = 4                          ;used by sidesteppers and fighterflies when flipped over, same as above, but it's the bottom tile that flickers
+Entity_Draw_8x16 = 5                                        ;8x16. used by coins, freezies and other effects
+Entity_Draw_8x16_Shift = 6                                  ;8x16 but the top tile is slightly shifted horizontally. used by Shellcreepers
+Entity_Draw_8x8 = 7                                         ;should be obvious, used for fireballs and various effects
 
 ;Entity graphics (first tile for each, after which +1 is added for others)
 ;$B6
