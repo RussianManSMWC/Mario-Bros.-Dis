@@ -1,4 +1,4 @@
-;converts standard utf-8 charset into the one used by this game
+;converts standart utf-8 charset into the one used by this game
 
 ;numbers 0-9
 .CHARMAP $30,$00
@@ -60,8 +60,8 @@
 ;apostrophe
 .CHARMAP $27,$65
 
-;some non-standard character tiles
+;some non-standart character tiles
 CopyrightSymbol = $25
-DecimalSeparator = $66				;like a dot but in the middle, used for bonus timer
-TwoExclamationMarks = $67			;there isn't a singular exclamation mark character, only two together
-DotAndComma = $28				;not semicolon (.,)
+DecimalSeparator = $66                                      ;like a dot but in the middle, used for bonus timer
+TwoExclamationMarks = $67                                   ;there isn't a singular exclamation mark character, only two together
+DotAndComma = $28                                           ;not semicolon
