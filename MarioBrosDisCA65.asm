@@ -1206,7 +1206,7 @@ HandlePlayerEntities_C5DB:
    STA Entity_Luigi_ControllerInputs                        ;
 
 CODE_C5F8:
-   JSR CODE_CB9B                                            ;copy to current entity addresses (Entity_Address->CurrentEntity_Address)
+   JSR LoadCurrentEntityVariables_CB9B                      ;copy to current entity addresses (Entity_Address->CurrentEntity_Address)
 
    LDA CurrentEntity_ActiveFlag                             ;is the player active?
    BNE CODE_C605                                            ;if so, do the normal player stuff
@@ -1265,17 +1265,17 @@ CODE_C647:
    LDA PhaseCompleteFlag                                    ;are ya winning, son?
    BNE CODE_C62C                                            ;if so, some kinda timer thing again. man they really want to check you winning
 
-   JSR CODE_D6BA                                            ;handle various states
+   JSR HandleEntityBumpedStates_D6BA                        ;handle platform bumping reaction
    JSR HandleEntityMovement_C785                            ;movement related
    JSR Player_CalculateVRAMPosForBump_CC3F                  ;calculate player's VRAM position for bumpy action
    JSR CODE_DC75                                            ;handle interaction with other entities (like enemies)
 
 CODE_C657:
    JSR HandleEntityGraphics_CBC4                            ;player graphics
-   JSR CODE_CBB6                                            ;store current entity address values back into entity's actual addresses (CurrentEntity_Address->Entity_Address)
+   JSR StoreCurrentEntityVariables_CBB6                     ;store current entity address values back into entity's actual addresses (CurrentEntity_Address->Entity_Address)
 
 CODE_C65D:
-   JSR CODE_CBAE                                            ;next entity addresses (Luigi)
+   JSR UpdateEntityAddressOffset_CBAE                       ;next entity addresses (Luigi)
 
    DEC $33                                                  ;player loop
    BNE CODE_C5F8                                            ;run 2nd player
@@ -1303,7 +1303,7 @@ CODE_C66F:
    STA Entity_VRAMPositionIndex                             ;skip over players and reflecting fireball for VRAM checks
 
 EntityProcessingLoop_C686:
-   JSR CODE_CB9B                                            ;copy to current entity addresses (CurrentEntity_Address)
+   JSR LoadCurrentEntityVariables_CB9B                      ;copy to current entity addresses (CurrentEntity_Address)
 
    LDA CurrentEntity_ActiveFlag                             ;entity active?
    BNE CODE_C697                                            ;take care of it
@@ -1372,7 +1372,7 @@ CODE_C6E0:
 
 ;entity is normal
 CODE_C6E9:
-   JSR CODE_D6BA                                            ;state stuff
+   JSR HandleEntityBumpedStates_D6BA                        ;state stuff
    JSR CODE_DB53                                            ;
    JSR CODE_DBFF                                            ;interact with other entitites
 
@@ -1452,15 +1452,15 @@ CODE_C758:
    DEC $44                                                  ;-1 entity on-screen
 
 CODE_C75A:  
-   JSR CODE_CBB6                                            ;store entity values from temporary addresses
+   JSR StoreCurrentEntityVariables_CBB6                     ;store entity values from temporary addresses
 
 CODE_C75D:
-   JSR CODE_CBAE                                            ;next entity
+   JSR UpdateEntityAddressOffset_CBAE                       ;next entity
    
    DEC $33                                                  ;loop until all are processed
    BNE CODE_C782
    
-   LDA EntitySpawnIndex                                     ;if we didn't spawn all required enemies
+   LDA EntitySpawnOffset                                    ;if we didn't spawn all required enemies
    CMP #$AA                                                 ;
    BNE CODE_C781                                            ;don't check for victory yet
 
@@ -1530,7 +1530,7 @@ CODE_C7B7:
    LDA CurrentEntity_MovementBits                           ;back this up
    STA $11                                                  ;
 
-   JSR CODE_CCA0                                            ;load vertical speed
+   JSR GetEntityUpdateData_CCA0                             ;load vertical speed
 
    BIT $11                                                  ;check if it's falling (moving down) or jumping/bounces (up)
    BMI CODE_C7C7                                            ;
@@ -2066,23 +2066,23 @@ CODE_CA35:
    RTS                                                      ;/
 
 LoadPhaseVRAMAttributes_CA3B:
-   Macro_LoadWordAX DATA_F23F                               ;
+   Macro_LoadWordAX GeneralPhaseAttributes_F23F             ;
    JSR CODE_CA5E                                            ;set attributes for each phase (HUD, brick floor)
 
-   Macro_LoadWordAX DATA_F266                               ;
+   Macro_LoadWordAX PlatformAttributes_Tiles93And97_F266    ;
 
    LDY PlatformTileOffset                                   ;load attributes based on ledge value
    BEQ CODE_CA5E                                            ;tile 93
    CPY #$04                                                 ;ice (test your skill bonus)
    BEQ CODE_CA5E                                            ;
 
-   Macro_LoadWordAX DATA_F276                               ;
+   Macro_LoadWordAX PlatformAttributes_Tiles94And96_F276    ;
    CPY #$01                                                 ;tile 94
    BEQ CODE_CA5E                                            ;
    CPY #$03                                                 ;tile 96
    BEQ CODE_CA5E                                            ;
 
-   Macro_LoadWordAX DATA_F286                               ;(for tile 95)
+   Macro_LoadWordAX PlatformAttributes_Tile95_F286          ;(for tile 95)
 
 CODE_CA5E:
    Macro_StoreWordAX $00                                    ;
@@ -2097,11 +2097,11 @@ UpdatePalette_CA66:
    DEY                                                      ;check if supposed to load gameplay palette
    BEQ CODE_CA73                                            ;do so if set, otherwise set palette for title screen
 
-   Macro_LoadWordAX DATA_F227                               ;Setup address to read data from
+   Macro_LoadWordAX PaletteData_TitleScreen_F227            ;Setup address to read data from
    BNE CODE_CA77                                            ;
 
 CODE_CA73:
-   Macro_LoadWordAX DATA_F203                               ;setup different data address to read from
+   Macro_LoadWordAX PaletteData_Gameplay_F203               ;setup different data address to read from
 
 CODE_CA77:
    LDY #$00                                                 ;
@@ -2322,7 +2322,8 @@ CODE_CB6A:
 CODE_CB84:
    RTS                                                      ;
 
-CODE_CB85:
+;add current entity address offset to base address
+OffsetEntityAddress_CB85:
    Macro_MoveWord $A0, $14
 
    LDA $A2                                                  ;offset 
@@ -2337,8 +2338,9 @@ CODE_CB85:
    TAX                                                      ;
    RTS                                                      ;
 
-CODE_CB9B:
-   JSR CODE_CB85                                            ;
+;fetch variables from Entity_Address values for current entity into zero page (CurrentEntity_Address)
+LoadCurrentEntityVariables_CB9B:
+   JSR OffsetEntityAddress_CB85                             ;
 
 CODE_CB9E:
    LDA ($14),Y                                              ;store into temprorary "current entity" addresses that save space significantly
@@ -2355,16 +2357,16 @@ CODE_CB9E:
    RTS                                                      ;
 
 ;next entity addresses
-;LoadNextEntityVariables_CBAE:
-CODE_CBAE:
+UpdateEntityAddressOffset_CBAE:
    LDA $A2                                                  ;
    CLC                                                      ;
    ADC #<Entity_Address_Size                                ;
    STA $A2                                                  ;
    RTS                                                      ;
 
-CODE_CBB6:
-   JSR CODE_CB85                                            ;remember what entity's tables are we storing to
+;transfers CurrentEntity_Address variables into Entity_Address
+StoreCurrentEntityVariables_CBB6:
+   JSR OffsetEntityAddress_CB85                             ;remember what entity's tables are we storing to
 
 CODE_CBB9:
    LDA CurrentEntity_Address,X                              ;store entity values where they belong (before moving onto next entity)
@@ -2388,10 +2390,10 @@ HandleEntityGraphics_CBC4:
    LDA #<DrawModeTileConfigurationPointers_F296             ;
    STA $14                                                  ;
 
-   LDA CurrentEntity_DrawMode                               ;get pointers to graphics depending on its draw mode
-   JSR CODE_CC29                                            ;
+   LDA CurrentEntity_DrawMode                               ;get a data pointer for the current drawing configuration
+   JSR GetDataPointer_CC29                                  ;
 
-   LDA CurrentEntity_DrawTile                               ;first sprite tile to draw from (as in first tile is 12, then 13, then 14, etc.)
+   LDA CurrentEntity_DrawTile                               ;first sprite tile to draw from (e.g. first tile is 12, then 13, then 14, etc.)
    STA $11                                                  ;
 
    LDY #$00                                                 ;
@@ -2461,18 +2463,24 @@ CODE_CC22:
    BNE CODE_CBDD                                            ;otherwise loop
    RTS                                                      ;
 
-CODE_CC29:
+;Input:
+;A - pointer ID
+;$14 - a pointer to a block of data pointers
+;
+;output:
+;$12 - individual data pointer from the block
+GetDataPointer_CC29:
    ASL A                                                    ;get correct pointer, multiply by 2
    STA $12                                                  ;
 
-   LDA #$00                                                 ;reset A and Y (not sure why ROL is here)
+   LDA #$00                                                 ;reset A and Y
    TAY                                                      ;
-   ROL A                                                    ;
+   ROL A                                                    ;ROL for 16-bit handling
    STA $13                                                  ;
 
-   JSR OffsetPointer_CDB4                                   ;add to offset
+   JSR OffsetPointer_CDB4                                   ;offset
 
-   LDA ($14),Y                                              ;get graphic data pointer
+   LDA ($14),Y                                              ;get resulting data pointer
    STA $12                                                  ;
    INY                                                      ;
    LDA ($14),Y                                              ;
@@ -2555,16 +2563,12 @@ CODE_CC8F:
    STX Entity_VRAMPositionIndex                             ;index for all the other entities (maybe a second player even)
    RTS                                                      ;
 
-;update entity's pointer
-;GetEntityData_CCA0:                                        ;generic name... but then again, the data itself can be different things (y-speed, animation frames and stuff)
-CODE_CCA0:
+;fetch a byte from CurrentEntity_UpdateDataPointer, and update the pointer.
+;used for speeds and animations
+GetEntityUpdateData_CCA0:
    STY $1E                                                  ;saves y just in case
 
-   LDA CurrentEntity_UpdateDataPointer                      ;in this case, holds Y-speed pointer
-   STA $14                                                  ;
-
-   LDA CurrentEntity_UpdateDataPointer+1                    ;
-   STA $15                                                  ;
+   Macro_MoveWord CurrentEntity_UpdateDataPointer, $14
 
    LDY #$00                                                 ;
    LDA ($14),Y                                              ;
@@ -2619,13 +2623,13 @@ CODE_CCD5:
    STY $00                                                  ;/store to scratch ram
    STA ControllerInputHolding,x                             ;\store controller input (holding)
    STA ControllerInputPress,x                               ;/(press)
-   AND #$FF                                                 ;\if A and B are pressed
+   AND #$FF                                                 ;\if A is pressed
    BPL CODE_CCFE                                            ;/meh
 
    BIT $00                                                  ;if these buttons are pressed again
    BPL CODE_CCFE                                            ;don't reset bits
 
-   AND #$7F                                                 ;\reset A and B press bits
+   AND #~Input_A                                            ;\reset A bit only
    STA ControllerInputPress,x                               ;/
 
 CODE_CCFE:
@@ -2989,14 +2993,12 @@ CODE_CE94:
 
 ;used to animate some entities (specifically, their movement)
 UpdateEntityGFXFrame_WhenGrounded_CE95:
-CODE_CE95:
    LDA CurrentEntity_MovementBits                           ;if an entity is neither falling or jumping, don't animate
    AND #Entity_MovementBits_AirMovement                     ;
    BEQ UpdateEntityGFXFrame_WhenMoving_CE9C                 ;
    RTS                                                      ;
 
 UpdateEntityGFXFrame_WhenMoving_CE9C:
-CODE_CE9C:
    LDA CurrentEntity_MovementBits                           ;is entity even moving? no?
    AND #Entity_MovementBits_MovingHorz                      ;not wew! anymore
    BNE UpdateEntityGFXFrame_CEA3                            ;yes? dew yeet
@@ -3004,7 +3006,6 @@ CODE_CE9C:
 
 ;actual animation here
 UpdateEntityGFXFrame_CEA3:
-CODE_CEA3:
    LDY CurrentEntity_AnimationPointer                       ;
    LDA EntityMovementAnimations_F4B2,Y                      ;
    CMP #$FF                                                 ;encountered loop command?
@@ -3045,9 +3046,9 @@ CODE_CED9:
    LDY #$00
 
    LDA ($A0),y                                              ;check if entity is active
-   BEQ CODE_CEEF                                            ;if not, spawn
+   BEQ SetEntityToSpawn_CEEF                                ;if not, spawn
 
-   JSR CODE_CB85
+   JSR OffsetEntityAddress_CB85                             ;go to next entity
 
    Macro_MoveWord $14, $A0
 
@@ -3056,23 +3057,23 @@ CODE_CED9:
    RTS
 
 ;initialize enemy!
-CODE_CEEF:
-   LDY $35
+SetEntityToSpawn_CEEF:
+   LDY EntitySpawnOffset                                    ;
    STY $1F
    INY               
-   LDA ($36),Y         
+   LDA (EntitySpawnPointer),Y                               ;next thing to spawn...
    STA $1E
    STA $1D
 
    INY
-   LDA ($36),Y
-   CMP #$AA                 
-   BEQ CODE_CF04
-   STA PipeDelayTimer
-   TYA
+   LDA (EntitySpawnPointer),Y                               ;how long should it take for the next thing to spawn
+   CMP #$AA                                                 ;
+   BEQ CODE_CF04                                            ;if $AA, that's the end of the table, don't spawn more
+   STA PipeDelayTimer                                       ;
+   TYA                                                      ;
 
 CODE_CF04:
-   STA $35
+   STA EntitySpawnOffset                                    ;offset for the next pair of bytes
 
    Macro_SetWord SpawnInitValues_Enemies_F452, $14
 
@@ -3186,12 +3187,12 @@ CODE_CF89:
 ;first, check hardcoded edges/ends (w/e you wanna call them) of platforms
 CODE_CF8B:
    LDA CurrentEntity_Player_VRAMPosLo                       ;
-   CMP DATA_F574,X                                          ;check VRAM location of the player
+   CMP PlatformEdgeVRAMLocs_F574,X                          ;check VRAM location of the player
    BNE CODE_CFA7                                            ;doesn't match
 
    LDA CurrentEntity_Player_VRAMPosHi                       ;high byte
    INX                                                      ;
-   CMP DATA_F574,X                                          ;
+   CMP PlatformEdgeVRAMLocs_F574,X                          ;
    BNE CODE_CFA8                                            ;
    CPX #$08                                                 ;if less than 08
    BCC CODE_CFC4                                            ;means right end of the platform
@@ -3214,7 +3215,7 @@ CODE_CFA8:
    CMP #$FA                                                 ;no variable hitbox, so only bopping the top two tiles count
    BCC CODE_CFB6                                            ;
 
-   JMP CODE_D2DF                                            ;Hit POW block.
+   JMP POWBlockInteraction_D2DF                             ;Hit POW block.
 
 ;check screen ends
 CODE_CFB6:
@@ -3865,7 +3866,7 @@ CODE_D2D0:
    JMP CODE_D27F                                            ;
 
 ;hit POW!
-CODE_D2DF:
+POWBlockInteraction_D2DF:
    LDA POWHitsLeft                                          ;if POW can still be hit
    BNE CODE_D2E4                                            ;run interaction
    RTS                                                      ;
@@ -3886,7 +3887,7 @@ CODE_D2E9:
    STA ShakeTimer                                           ;
 
    DEC POWHitsLeft                                          ;POW's "hitpoints" -1
-   JSR CODE_D593
+   JSR DrawPOWBlock_D593                                    ;re-draw POW block to update its appearance
 
    LDA Sound_Effect2                                        ;sound effect
    ORA #Sound_Effect2_POWBump                               ;
@@ -4305,7 +4306,7 @@ CODE_D518:
    STA $02                                                  ;
 
 CODE_D51C:
-   LDA DATA_F1E7,Y                                          ;
+   LDA PlatformLayoutData_F1E7,Y                            ;
    STA VRAMUpdateBufferTransfer,X                           ;into transfer buffer
    INY                                                      ;
    INX                                                      ;
@@ -4325,7 +4326,7 @@ CODE_D51C:
    BNE CODE_D54A                                            ;
 
 CODE_D53A:
-   LDA DATA_F1E7,Y                                          ;used to check for stop command
+   LDA PlatformLayoutData_F1E7,Y                            ;used to check for stop command
    STA $00                                                  ;
 
    LDA $07                                                  ;ledge tile
@@ -4347,9 +4348,9 @@ CODE_D54F:
    Macro_LoadWordXY VRAMUpdateBufferTransfer                ;
    JSR DrawStripeImageInit_D5D5                             ;store into main buffer that will be used for updates for real
 
-   JSR CODE_D58C                                            ;draw pipes
-   JSR CODE_D593                                            ;draw POW block
-   JSR CODE_D5BE                                            ;HUD init
+   JSR DrawPipes_D58C                                       ;draw pipes
+   JSR DrawPOWBlock_D593                                    ;draw POW block
+   JSR DrawHUDElements_D5BE                                 ;HUD init
 
    LDA #$00                                                 ;reset platform bump variables
    LDX #$09                                                 ;
@@ -4362,7 +4363,7 @@ CODE_D568:
 
 ;spawn stuff that needs to be defeated
 HandleEntitySpawn_D56E:
-   LDA EntitySpawnIndex                                     ;don't spawn entities...
+   LDA EntitySpawnOffset                                    ;don't spawn entities...
    CMP #$AA                                                 ;exhasted all from the list
    BEQ CODE_D58B                                            ;
    CMP #$BB                                                 ;...if bonus phase
@@ -4371,9 +4372,9 @@ HandleEntitySpawn_D56E:
    LDA PipeDelayTimer                                       ;wait for the enemy to come out
    BNE CODE_D58B                                            ;
 
-   LDA CurrentPhase                                         ;if 2nd phase, skip some check
+   LDA CurrentPhase                                         ;I guess phase 2 ignores the enemy cap?
    CMP #$02                                                 ;
-   BEQ CODE_D588                                            ;only phase 2 can have more than 4 required enemies at once
+   BEQ CODE_D588                                            ;
 
    LDA $45                                                  ;check the amount of enemies on-screen?
    CMP #$04                                                 ;
@@ -4385,13 +4386,13 @@ CODE_D588:
 CODE_D58B:
    RTS                                                      ;
 
-;draw pipes
-CODE_D58C:
+;draw pipes in levels
+DrawPipes_D58C:
    Macro_LoadWordXY Layout_LevelPipes_F4F5                  ;pointer for pipe tiles
    JMP DrawStripeImageInit_D5D5                             ;store indirect and write to buffer
 
 ;This code is used to draw POW (or nothing)
-CODE_D593:
+DrawPOWBlock_D593:
    LDA POWHitsLeft                                          ;POW hits
    ASL A                                                    ;
    ASL A                                                    ;
@@ -4402,8 +4403,8 @@ CODE_D593:
    LDA #$00                                                 ;
    STA $13                                                  ;
 
-   Macro_SetWord DATA_F560, $14
-   JSR OffsetPointer_CDB4                                   ;do some calculation
+   Macro_SetWord POWTilemaps_F560, $14
+   JSR OffsetPointer_CDB4                                   ;get appearance based on how many times the block has been hit
 
    Macro_SetWord VRAMLoc_POW, $00                           ;POW block's position
 
@@ -4415,20 +4416,20 @@ CODE_D593:
    JMP WriteScreenUpdateToBuffer_CE2C                       ;draw POW block (or the lack of it)
 
 ;This routine draws HUD during phase initialization (not the score values)
-CODE_D5BE:
-   Macro_LoadWordXY DATA_F660                               ;
-   JSR DrawStripeImageInit_D5D5                             ;draw part of the HUD
+DrawHUDElements_D5BE:
+   Macro_LoadWordXY Layout_HUDGeneral_F660                  ;
+   JSR DrawStripeImageInit_D5D5                             ;draw common HUD elements (player I and TOP)
 
    LDA #$01                                                 ;
    STA Player1ScoreUpdateFlag                               ;draw player 1 score
 
    LDA TwoPlayerModeFlag                                    ;check if in 2 player mode
-   BEQ DoNothing_D5E5                                            ;
+   BEQ DoNothing_D5E5                                       ;
 
    LDA #$01                                                 ;
    STA Player2ScoreUpdateFlag                               ;draw luigi's score
 
-   Macro_LoadWordXY DATA_F66B                               ;
+   Macro_LoadWordXY Layout_HUDPlayerII_F66B                 ;will draw II- for player 2
 
 ;X - table location, low byte
 ;Y - table location, high byte
@@ -4463,7 +4464,6 @@ InitLifeDisplay_1P_D5E6:
    BNE CODE_D5F0                                            ;Always branch
 
 InitLifeDisplay_2P_D5EC:
-CODE_D5EC:
    LDX Player2Lives                                         ;load number of player 2's lives to display
    LDY #Lives_Luigi_OAM_Slot*4                              ;
 
@@ -4539,7 +4539,7 @@ CODE_D634:
    LDY #$12                                                 ;get phase strings
 
 CODE_D63C:
-   LDA DATA_F722,Y                                          ;
+   LDA GeneralPhaseStrings_F722,Y                           ;
    STA VRAMUpdateBufferTransfer,Y                           ;into a buffer that'll store to another buffer
    DEY                                                      ;
    BPL CODE_D63C                                            ;
@@ -4564,7 +4564,7 @@ CODE_D63C:
    LDA #$F0                                                 ;
    STA TESTYOURSKILLStringTimer                             ;show test your skill string for this long
 
-   Macro_LoadWordXY DATA_F735                               ;actually load strings
+   Macro_LoadWordXY TestYourSkillPhaseLayout_F735           ;actually load strings (and timer box)
    JMP DrawStripeImageInit_D5D5                             ;draw em
 
 ;add a +1 to the phase counter, treat it as decimal
@@ -4579,8 +4579,8 @@ IncrementPhaseCounter_D672:
 CODE_D67E:
    RTS                                                      ;
 
-;supposed to initialize players!
-CODE_D67F:
+;load players in
+InitializePlayers_D67F:
    LDY #$1F                                                 ;offset for player 1
    LDX #$1F                                                 ;
 
@@ -4602,21 +4602,17 @@ CODE_D68F:
    BPL CODE_D68F                                            ;
    RTS                                                      ;
 
-;this is used to store initial enemy pipe time upon loading the phase
-CODE_D69A:
-   Macro_SetWord DATA_F3BA, $14
+;load enemy formation data, initialize first enemy spawn timer
+InitializeEnemyFormation_D69A:
+   Macro_SetWord EnemyFormationPointers_F3BA, $14
 
    LDA EnemyLevel                                           ;
-   JSR CODE_CC29                                            ;get pointer
+   JSR GetDataPointer_CC29                                  ;get pointer to current enemy formation
 
-   LDA $12                                                  ;store pointer
-   STA EntitySpawnPointer                                   ;
-
-   LDA $13                                                  ;
-   STA EntitySpawnPointer+1                                 ;
+   Macro_MoveWord $12, EntitySpawnPointer
 
    LDA #$00                                                 ;initialize index for enemy table
-   STA EntitySpawnIndex                                     ;btw, this is already set to zero before even entering this routine
+   STA EntitySpawnOffset                                    ;btw, this is already set to zero before even entering this routine
 
    LDY #$00                                                 ;
    LDA (EntitySpawnPointer),Y                               ;load time for enemy to spawn upon phase load
@@ -4624,8 +4620,7 @@ CODE_D69A:
    RTS                                                      ;
 
 ;set-up data related to being bumped (normal/flipped animation, timing flipped state, etc.)
-;HandleEntityBumpedStates_D6BA:
-CODE_D6BA:
+HandleEntityBumpedStates_D6BA:
    LDA CurrentEntity_ID                                     ;low nibble is only used by player entities
    AND #$0F                                                 ;
    BNE CODE_D710                                            ;player interact
@@ -4875,19 +4870,19 @@ CODE_D80E:
 
    JSR CODE_CAEB                                            ;only animate every few frames (depends on what entity it is)
 
-   JSR CODE_CCA0                                            ;fetch the animation graphic
+   JSR GetEntityUpdateData_CCA0                             ;fetch the animation graphic
    CMP #$FF                                                 ;reached the end of flipped animation table, get up
    BEQ CODE_D831                                            ;
    CMP #$00                                                 ;special command 0 - will change palette/speed-up
    BNE CODE_D829                                            ;
 
    JSR CODE_D9C5                                            ;the enemy becomes quicker
-   JSR CODE_CCA0                                            ;next table byte
+   JSR GetEntityUpdateData_CCA0                             ;next table byte
 
 CODE_D829:
    STA CurrentEntity_DrawTile                               ;store graphics
 
-   JSR CODE_CCA0                                            ;and store how long it'll display the frame
+   JSR GetEntityUpdateData_CCA0                             ;and store how long it'll display the frame
    STA CurrentEntity_UpdateTimer                            ;
    RTS                                                      ;
 
@@ -4955,7 +4950,7 @@ CODE_D877:
 
 ;freezie destroyed/coin collected
 CODE_D885:
-   JSR CODE_CCA0                                            ;
+   JSR GetEntityUpdateData_CCA0                             ;
    CMP #$EE                                                 ;
    BEQ CODE_D8C1                                            ;end of animation
    CMP #$DD                                                 ;
@@ -4973,7 +4968,7 @@ CODE_D89D:
    RTS                                                      ;
 
 CODE_D89E:
-   JSR CODE_CCA0                                            ;
+   JSR GetEntityUpdateData_CCA0                             ;
    STA CurrentEntity_DrawMode                               ;
    CMP #Entity_Draw_8x16                                    ;check if not this specific draw mode
    BNE CODE_D885                                            ;keep speeding up
@@ -4983,7 +4978,7 @@ CODE_D89E:
    JMP CODE_D885                                            ;
 
 CODE_D8AF:
-   JSR CODE_CCA0                                            ;
+   JSR GetEntityUpdateData_CCA0                             ;
    STA CurrentEntity_DrawTile                               ;
    CMP #GFX_CollectedCoin_Frame5                            ;check if at coin's last frame ($ sign)
    BNE CODE_D8C0                                            ;if not, ok
@@ -5389,7 +5384,7 @@ CODE_DA7E:
 CODE_DAA5:
    JSR CODE_DB1E                                            ;offset y-position if the screen's shaking because of POW (shake with the pipe)
 
-   JSR CODE_CCA0                                            ;apply y-speed (not really...
+   JSR GetEntityUpdateData_CCA0                             ;maybe apply y-speed
    CMP #$AA                                                 ;
    BEQ CODE_DAC1                                            ;
    TAY                                                      ;
@@ -6027,7 +6022,7 @@ CODE_DDE0:
    LDA #GFX_Player_FallDown                                 ;show the player as falling down
    STA CurrentEntity_DrawTile
 
-   JSR CODE_CCA0                                            ;
+   JSR GetEntityUpdateData_CCA0                             ;
    CMP #$AA                                                 ;ended hardcoded vertical speed values?
    BNE CODE_DDFB                                            ;
 
@@ -6201,7 +6196,7 @@ CODE_DEAF:
 
 ;entity has been kicked by the player, fall down to their watery doom
 CODE_DEBA:
-   JSR CODE_CCA0                                            ;you're going down (and to the side)
+   JSR GetEntityUpdateData_CCA0                             ;you're going down (and to the side)
    CMP #$AA                                                 ;
    BNE CODE_DEC3                                            ;check for terminator byte, if haven't encountered it yet, go down slower (mostly)
 
@@ -6214,7 +6209,7 @@ CODE_DEC3:
    BCS CODE_DEE0                                            ;
    STA CurrentEntity_YPos                                   ;update position
 
-   JSR CODE_CCA0                                            ;horizontal movement
+   JSR GetEntityUpdateData_CCA0                             ;horizontal movement
    CMP #$AA                                                 ;
    BEQ CODE_DEDF                                            ;again, terminator byte, if hit, it'll go straight down only
    EOR CurrentEntity_XSpeed                                 ;basically checks its direction, if it goes right or left
@@ -6282,7 +6277,7 @@ CODE_DF11:
    JMP CODE_CEBA                                            ;
 
 CODE_DF24:  
-   JSR CODE_D5EC                                            ;luigi's lives display
+   JSR InitLifeDisplay_2P_D5EC                              ;luigi's lives display
    
    LDA Player2TriggerGameOverFlag                           ;
    BNE CODE_DEFE                                            ;can't respawn
@@ -6607,12 +6602,12 @@ CODE_E0B8:
    JMP CODE_CA35                                            ;
 
 ;this table is used to set certain properties on phase load - enemy level, if it's a TEST YOUR SKILL phase and so on
-;For what enemies spawn per enemy level, see DATA_F3BA
+;For what enemies spawn per enemy level, see EnemyFormationPointers_F3BA
 ;First byte - enemy level or if $AA, if it's a TEST YOUR SKILL phase, if FF, set to certain position in table to repeat (don't read past the table)
 ;Second byte - platform tile offset - which tile to use for the platforms (visual)
 ;Third byte - wavy (green) fireball frequency (with lower values meaning low frequency)
 ;Forth byte - diagonal (red) fireball frequency
-DATA_E0D0:
+PhaseProperties_E0D0:
 .byte $00,$00,$00,$00
 .byte $01,$00,$00,$00
 
@@ -6682,15 +6677,15 @@ LoadPhaseProps_E14A:
    LDX PhaseLoad_PropIndex                                  ;get phase properties index
 
 CODE_E14F:
-   LDA DATA_E0D0,X                                          ;if first property byte is           
+   LDA PhaseProperties_E0D0,X                               ;if first property byte is           
    CMP #$AA                                                 ;$AA, it's "Test Your Skill" time.
    BNE CODE_E188                                            ;no? well...
    INX                                                      ;
-   LDA DATA_E0D0,X                                          ;second prop. byte
+   LDA PhaseProperties_E0D0,X                               ;second prop. byte
    STA PlatformTileOffset                                   ;contains 8x8 tile index platforms are made of
 
    INX                                                      ;
-   LDA DATA_E0D0,X                                          ;third prop. byte is initial timer, seconds
+   LDA PhaseProperties_E0D0,X                               ;third prop. byte is initial timer, seconds
    STA BonusTimeSecs                                        ;
 
    INX                                                      ;
@@ -6705,9 +6700,9 @@ CODE_E14F:
 
 CODE_E170:
    LDA #$BB                                                 ;
-   STA EntitySpawnIndex                                     ;don't spawn entities in bonus phase
+   STA EntitySpawnOffset                                    ;don't spawn entities in bonus phase
 
-   JSR CODE_D67F                                            ;put in players
+   JSR InitializePlayers_D67F                               ;put in players
 
    LDA #MarioInTestYourSkill_OAM_Slot*4                     ;player 1 takes OAM slots from this point
    STA Entity_Mario_OAMOffset                               ;
@@ -6727,12 +6722,12 @@ CODE_E188:
    BNE CODE_E14F                                            ;start prop. loading over
 
 CODE_E190:
-   LDA DATA_E0D0,X                                          ;store first prop. byte in $34 (not sure why you have to reload it but whatev)
+   LDA PhaseProperties_E0D0,X                               ;store first prop. byte in $34 (not sure why you have to reload it but whatev)
    STA EnemyLevel                                           ;contains "enemy level"
 
    INX                                                      ;second prop.
-   LDA DATA_E0D0,X                                          ;contains platform tile index
-   STA PlatformTileOffset                                   ;in da $32
+   LDA PhaseProperties_E0D0,X                               ;contains platform tile index
+   STA PlatformTileOffset                                   ;
 
    INX                                                      ;
    LDY #$01                                                 ;
@@ -6742,21 +6737,21 @@ CODE_E190:
    STY FreezieCanAppearFlag                                 ;
    
 CODE_E1A7:
-   LDA DATA_E0D0,X                                          ;third prop.
+   LDA PhaseProperties_E0D0,X                               ;third prop.
    STA WaveFireball_SpawnTimerIndex                         ;timer index for wavy fireball frequency
    
    INX                                                      ;forth and last phase prop.
-   LDA DATA_E0D0,X                                          ;
-   STA $04FC                                                ;timer index for diagonal reflecting fireball frequency
+   LDA PhaseProperties_E0D0,X                               ;
+   STA ReflectingFireball_SpawnTimer                        ;timer index for diagonal reflecting fireball frequency
    INX                                                      ;
    STX PhaseLoad_PropIndex                                  ;store prop. index for next time we enter this routine
 
    LDA #$00                                                 ;reset "enemies to defeat" index (?)
-   STA EntitySpawnIndex                                     ;
+   STA EntitySpawnOffset                                    ;
 
    JSR CODE_E97A                                            ;initialize fireball spawn timers
-   JSR CODE_D67F                                            ;put players in the game!
-   JSR CODE_D69A                                            ;
+   JSR InitializePlayers_D67F                               ;put players in the game!
+   JSR InitializeEnemyFormation_D69A                        ;
 
 CODE_E1C4:
    JSR IncrementPhaseCounter_D672                           ;next phase, add a +1 to the phase number
@@ -6766,7 +6761,7 @@ CODE_E1C4:
    BNE CODE_E1F4                                            ;
 
 CheckForPhaseEnd_E1CE:
-   LDA EntitySpawnIndex                                     ;are there more enemies to spawn?
+   LDA EntitySpawnOffset                                     ;are there more enemies to spawn?
    CMP #$AA                                                 ;
    BNE CODE_E1F6                                            ;yes, return
 
@@ -6866,7 +6861,7 @@ CODE_E239:
 
    INC Player2_Got1UPFlag                                   ;
    INC Player2Lives                                         ;
-   JSR CODE_D5EC                                            ;
+   JSR InitLifeDisplay_2P_D5EC                              ;
 
 CODE_E24E:
    LDA TransitionTimer                                      ;if not transitioning, play sound now
@@ -7141,7 +7136,7 @@ CODE_E3BB:
    STA $A2                                                  ;
 
 CODE_E3C7:
-   JSR CODE_CB9B
+   JSR LoadCurrentEntityVariables_CB9B                      ;
 
    LDA CurrentEntity_ActiveFlag                             ;entity currently active?
    BEQ CODE_E3E3                                            ;can't even animate
@@ -7161,10 +7156,10 @@ CODE_E3DD:
    JSR HandleEntityGraphics_CBC4                            ;update graphical display
 
 CODE_E3E0:
-   JSR CODE_CBB6                                            ;next entity plz
+   JSR StoreCurrentEntityVariables_CBB6                     ;store updated variables back to where they came from
 
 CODE_E3E3:
-   JSR CODE_CBAE                                            ;move onto next entity
+   JSR UpdateEntityAddressOffset_CBAE                       ;move onto next entity
 
    DEC $33                                                  ;updated all coins?
    BNE CODE_E3C7                                            ;keep doing
@@ -7206,7 +7201,7 @@ CODE_E403:
 
 ;coin collected animation
 CODE_E41E:
-   JSR CODE_CCA0                
+   JSR GetEntityUpdateData_CCA0                
    CMP #$CC                 
    BEQ CODE_E42F                
    CMP #$DD                 
@@ -7216,7 +7211,7 @@ CODE_E41E:
    BNE CODE_E3DD
 
 CODE_E42F:  
-   JSR CODE_CCA0
+   JSR GetEntityUpdateData_CCA0
    STA CurrentEntity_DrawMode
    CMP #Entity_Draw_8x16
    BNE CODE_E41E
@@ -7226,7 +7221,7 @@ CODE_E42F:
    JMP CODE_E41E
   
 CODE_E440:
-   JSR CODE_CCA0                
+   JSR GetEntityUpdateData_CCA0                
    STA CurrentEntity_DrawTile
    JMP CODE_E3DD
 
@@ -7254,10 +7249,10 @@ CODE_E464:
    JSR ClearScreenInit_CA20                                 ;clear screen
    JSR LoadPhaseVRAMAttributes_CA3B                         ;distribute colors across the screen (attributes)
    JSR RemoveSpriteTiles_CA2B                               ;clear OAM
-   JSR CODE_D5BE                                            ;draw some HUD elements
+   JSR DrawHUDElements_D5BE                                 ;draw some HUD elements
    JSR InitLives_D60F                                       ;prepare OAM slots for lives
-   JSR InitLifeDisplay_1P_D5E6                                            ;set Mario's lives Y-position
-   JSR CODE_D5EC                                            ;same for Luigi
+   JSR InitLifeDisplay_1P_D5E6                              ;set Mario's lives Y-position
+   JSR InitLifeDisplay_2P_D5EC                              ;same for Luigi
    JSR EnableRender_E13D                                    ;wait for NMI and enable rendering
 
    LDA #$00                                                 ;zero out RAM addresses for next state
@@ -7824,8 +7819,8 @@ CODE_E7AD:
    LDA WaveFireball_MainCodeFlag                            ;did it initialize?
    BNE CODE_E7BD                                            ;
 
-   JSR CODE_EEAD                                            ;see if it can spawn this moment
-   JSR CODE_E9A0                                            ;init fireball's values
+   JSR CheckFireballSpawnConditions_EEAD                    ;see if it can spawn this moment
+   JSR InitializeWavyFireball_E9A0                          ;init fireball's values
 
    LDA #$01                                                 ;init over
    STA WaveFireball_MainCodeFlag                            ;
@@ -7911,7 +7906,7 @@ CODE_E830:
    STA Entity_WavyFireball_State                            ;
    JSR EnableFireballSound_E96D                             ;happy fireball noises
 
-   Macro_LoadWordXY DATA_EFDB                               ;start appearing in
+   Macro_LoadWordXY WavyFireball_AppearingAnimFrames_EFDB   ;start appearing in
 
 CODE_E842:
    Macro_StoreWordXY Entity_WavyFireball_UpdateDataPointer  ;
@@ -8115,7 +8110,7 @@ CODE_E952:
    LDA #Fireball_State_Disappears                           ;make it disappear
    STA Entity_WavyFireball_State                            ;(I think)
 
-   Macro_LoadWordXY DATA_F006                               ;disappear animation
+   Macro_LoadWordXY Fireball_DisappearingAnimFrames_F006                               ;disappear animation
    JMP CODE_E842                                            ;
 
 CODE_E95E:
@@ -8169,7 +8164,7 @@ CODE_E998:
    RTS                                                      ;
 
 ;initialize wavy fireball
-CODE_E9A0:
+InitializeWavyFireball_E9A0:
    LDX #$1F                                                 ;
 
 CODE_E9A2:
@@ -8184,7 +8179,7 @@ InitializeReflectingFireball_E9AC:
    LDX #$1F                                                 ;
 
 CODE_E9AE:
-   LDA SpawnInitValues_ReflectingFireball_EFBB,X;
+   LDA SpawnInitValues_ReflectingFireball_EFBB,X            ;
    STA Entity_ReflectingFireball_ActiveFlag,X               ;
    DEX                                                      ;
    BPL CODE_E9AE                                            ;
@@ -8197,15 +8192,15 @@ CODE_E9B8:
    CMP #$10                                                 ;
    BNE CODE_E9D2                                            ;
 
-   LDA #$02                                                 ;fireball disappears or smth...
+   LDA #$02                                                 ;fireball will disappear on player contact
    STA ($14),Y                                              ;
 
    LDY #$0C                                                 ;
-   LDA #<DATA_F006                                          ;
+   LDA #<Fireball_DisappearingAnimFrames_F006                                          ;
    STA ($14),Y                                              ;
 
    INY                                                      ;
-   LDA #>DATA_F006                                          ;
+   LDA #>Fireball_DisappearingAnimFrames_F006                                          ;
    STA ($14),Y                                              ;
 
    JMP CODE_DCCE                                            ;
@@ -8294,7 +8289,7 @@ CODE_EA37:
    LDA ReflectingFireball_MainCodeFlag                      ;run main code for fireball
    BNE CODE_EA4C                                            ;
 
-   JSR CODE_EEAD                                            ;see if it can spawn this moment
+   JSR CheckFireballSpawnConditions_EEAD                    ;see if it can spawn this moment
    JSR InitializeReflectingFireball_E9AC                    ;set initial values for reflecting fireball entity
 
    LDA #$01                                                 ;set the flag
@@ -8336,7 +8331,7 @@ CODE_EA7C:
    BCS CODE_EA90                                            ;don't even play the appearing animation
 
    LDA #Fireball_State_Appears                              ;continue appearing
-   Macro_LoadWordXY DATA_EF9D
+   Macro_LoadWordXY ReflectingFireball_AppearingAnimFrames_EF9D
 
 CODE_EA87:
    STA Entity_ReflectingFireball_State                      ;
@@ -8460,11 +8455,11 @@ CODE_EB1C:
    LDX #$00
 
 CODE_EB32:
-   LDA DATA_F574,X                                          ;check for platform edges
+   LDA PlatformEdgeVRAMLocs_F574,X                          ;check for platform edges
    CMP Entity_ReflectingFireball_VRAMPosLo                  ;
    BNE CODE_EB42                                            ;
 
-   LDA DATA_F574+1,X                                        ;
+   LDA PlatformEdgeVRAMLocs_F574+1,X                        ;
    CMP Entity_ReflectingFireball_VRAMPosHi                  ;
    BEQ CODE_EB4A                                            ;matches up
 
@@ -8594,7 +8589,7 @@ CODE_EBE0:
 
 CODE_EBE9:
    LDA #Fireball_State_Disappears                           ;the fireball will start disappearing
-   Macro_LoadWordXY DATA_F006                               ;
+   Macro_LoadWordXY Fireball_DisappearingAnimFrames_F006                               ;
    JMP CODE_EA87                                            ;
 
 ;reflecting fireball's GFX
@@ -9034,20 +9029,20 @@ CODE_EE4C:
 
 ;Freezie platform freeze pointers
 DATA_EE53:
-.byte >DATA_F763,<DATA_F763                                 ;$F7,$63
-.byte >DATA_F76D,<DATA_F76D                                 ;$F7,$6D
-.byte >DATA_F77B,<DATA_F77B                                 ;$F7,$7B
-.byte >DATA_F78B,<DATA_F78B                                 ;$F7,$8B
+.dbyt DATA_F763
+.dbyt DATA_F76D
+.dbyt DATA_F77B
+.dbyt DATA_F78B
 .byte VRAMWriteCommand_Stop
 
-.byte >DATA_F79B,<DATA_F79B                                 ;$F7,$9B
-.byte >DATA_F7A4,<DATA_F7A4                                 ;$F7,$A4
-.byte >DATA_F7B3,<DATA_F7B3                                 ;$F7,$B3
+.dbyt DATA_F79B
+.dbyt DATA_F7A4
+.dbyt DATA_F7B3
 .byte VRAMWriteCommand_Stop
 
-.byte >DATA_F7C2,<DATA_F7C2                                 ;$F7,$C2
-.byte >DATA_F7CB,<DATA_F7CB                                 ;$F7,$CB
-.byte >DATA_F7DA,<DATA_F7DA                                 ;$F7,$DA
+.dbyt DATA_F7C2
+.dbyt DATA_F7CB
+.dbyt DATA_F7DA
 .byte VRAMWriteCommand_Stop
 
 ;turn tiles into frozen ones (runs from NMI!)
@@ -9104,10 +9099,10 @@ CODE_EEA5:
    RTS                                                      ;
 
 ;passing checks for fireball spawn - if it should even spawn
-CODE_EEAD:
-   LDA EntitySpawnIndex                                     ;check if an enemy is currently being spawned (or if we're in TEST YOUR SKILL phase)
-   CMP #$AA                                                 ;
-   BNE CODE_EEB9                                            ;fireball won't appear at the same time
+CheckFireballSpawnConditions_EEAD:
+   LDA EntitySpawnOffset                                    ;fireballs will only spawn when the list of required enemies is exhausted (towards the of the level basically)
+   CMP #$AA                                                 ;and also don't spawn in bonus phases, naturally
+   BNE CODE_EEB9                                            ;
 
    LDA $45                                                  ;check if there aren't too many enemies on-screen
    CMP #$04                                                 ;
@@ -9169,7 +9164,7 @@ CODE_EEEE:
    STA Score_OAM_X+4,X                                      ;
 
    LDY $1E                                                  ;load score value
-   LDA DATA_EF97,Y                                          ;load respective sprite tile
+   LDA ScoreSpriteTileData_EF97,Y                           ;load respective sprite tile
    STA Score_OAM_Tile,X                                     ;
 
    LDA #Score_Zeros_Tile                                    ;second tile is always "00"
@@ -9233,7 +9228,7 @@ CODE_EF50:
    LDY #$00                                                 ;
 
 CODE_EF5A:
-   LDA DATA_EF67,X                                          ;store properties
+   LDA FreezeEffectOAMData_EF67,X                           ;store properties
    STA FreezeEffect_OAM_Y,Y                                 ;
 
    INX                                                      ;
@@ -9243,7 +9238,7 @@ CODE_EF5A:
    RTS                                                      ;
 
 ;freeze effect tiles' OAM data
-DATA_EF67:
+FreezeEffectOAMData_EF67:
 .byte $77,FreezeEffect_Tile1,FreezeEffect_Property,$70
 .byte $77,FreezeEffect_Tile2,FreezeEffect_Property,$78
 .byte $77,FreezeEffect_Tile2,FreezeEffect_Property|OAMProp_XFlip,$80
@@ -9259,8 +9254,8 @@ DATA_EF67:
 .byte $A7,FreezeEffect_Tile2,FreezeEffect_Property|OAMProp_XFlip,$D0
 .byte $A7,FreezeEffect_Tile1,FreezeEffect_Property|OAMProp_XFlip,$D8
 
-;Sprite tile values for each score value.
-DATA_EF97:
+;Sprite tile values for each score value (second tile is always the same).
+ScoreSpriteTileData_EF97:
 .byte Score_8_Tile                                          ;8 for 800
 .byte Score_16_Tile                                         ;16 for 1600
 .byte Score_24_Tile                                         ;24 for 2400
@@ -9271,8 +9266,7 @@ DATA_EF97:
 ;reflecting fireball appearing effect animation table
 ;$00 - keep the same frame as before, used to prolong the frame of animation
 ;$FF - terminator, as you'd expect
-;ReflectingFireball_AppearingAnimFrames_EF9D:
-DATA_EF9D:
+ReflectingFireball_AppearingAnimFrames_EF9D:
 .byte GFX_Fireball_Pop2,$00
 .byte GFX_Fireball_Pop3,$00
 .byte GFX_Fireball_Pop5,$00,$00
@@ -9321,7 +9315,8 @@ SpawnInitValues_ReflectingFireball_EFBB:
 .byte $04,$04                                               ;CurrentEntity_HitBoxHeight/CurrentEntity_HitBoxWidth
 
 ;wavy fireball appearing effect animation table
-DATA_EFDB:
+
+WavyFireball_AppearingAnimFrames_EFDB:
 .byte GFX_Fireball_Pop2,$00
 .byte GFX_Fireball_Pop3,$00
 .byte GFX_Fireball_Pop5,$00
@@ -9345,15 +9340,11 @@ DATA_EFDB:
 .byte GFX_Fireball_Pop1,$00
 .byte $FF
 
-;reflecting fireball disappearing effect animation table
-DATA_F006:
+;reflecting and wavy fireball disappearing effect animation table
+Fireball_DisappearingAnimFrames_F006:
 .byte GFX_Fireball_Pop1,$00
 .byte GFX_Fireball_Pop2,$00
-.byte GFX_Fireball_Pop3,$00
-
-;shared with wavy fireball
-DATA_F00C:
-.byte $00
+.byte GFX_Fireball_Pop3,$00,$00
 .byte GFX_Fireball_Pop4,$00
 .byte GFX_Fireball_Pop5,$00
 .byte GFX_Fireball_Pop2,$00
@@ -9440,89 +9431,91 @@ WavyFireball_SpawnYPos_F0A1:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 Layout_TitleScreen_F0A5:
-.byte $20,$83                                               ;location to write to
-.byte $02                                                   ;amount of bytes to write in line
+.dbyt $2083                                                 ;location to write to
+.byte 2                                                     ;amount of bytes to write in line
 .byte $76,$7A                                               ;tiles to write
 
-.byte $20,$A3                                               ;next location
-.byte $02                                                   ;amount of tiles
+.dbyt $20A3                                                 ;next location
+.byte 2                                                     ;amount of tiles
 .byte $77,$79                                               ;tiles
 
-.byte $20,$9A                                               ;etc.
-.byte $02
+.dbyt $209A                                                 ;etc.
+.byte 2
 .byte $7C,$7E
 
-.byte $20,$BA
-.byte $02
+.dbyt $20BA
+.byte 2
 .byte $7D,$7F
 
-.byte $21,$63
-.byte $02
+.dbyt $2163
+.byte 2
 .byte $80,$82
 
-.byte $21,$83
-.byte $02
+.dbyt $2183
+.byte 2
 .byte $81,$83
 
-.byte $21,$7A
-.byte $02
+.dbyt $217A
+.byte 2
 .byte $84,$86
 
-.byte $21,$9A
-.byte $02
+.dbyt $219A
+.byte 2
 .byte $85,$87
 
-.byte $20,$85
-.byte VRAMWriteCommand_Repeat|$0A
+.dbyt $2085
+.byte VRAMWriteCommand_Repeat|10
 .byte $7B
 
-.byte $20,$90
-.byte VRAMWriteCommand_Repeat|$0A
+.dbyt $2090
+.byte VRAMWriteCommand_Repeat|10
 .byte $7B
 
-.byte $21,$85
-.byte VRAMWriteCommand_Repeat|$0A
+.dbyt $2185
+.byte VRAMWriteCommand_Repeat|10
 .byte $89
 
-.byte $21,$90
-.byte VRAMWriteCommand_Repeat|$0A
+.dbyt $2190
+.byte VRAMWriteCommand_Repeat|10
 .byte $89
 
-.byte $20,$C3
-.byte $19                                                   ;this time we write 25 tiles in a row
-.byte $78,$24,$24,$68,$69,$69,$6B,$69,$68
-.byte $69,$68,$6B,$69,$24,$68,$69,$68
-.byte $69,$6B,$69,$6B,$69,$24,$24,$88
+.dbyt $20C3
+.byte 25                                                    ;this time we write 25 tiles in a row
+.byte $78,$24,$24,$68,$69,$69,$6B,$69
+.byte $68,$69,$68,$6B,$69,$24,$68,$69
+.byte $68,$69,$6B,$69,$6B,$69,$24,$24
+.byte $88
 
-.byte $20,$E6
-.byte $13                                                   ;this time 19 tiles
-.byte $68,$6A,$6A,$6E,$6A
-.byte $68,$6A,$68,$6E,$6A,$24,$68,$6A
-.byte $68,$6A,$6E,$6A,$6E,$71
+.dbyt $20E6
+.byte 19                                                    ;this time 19 tiles
+.byte $68,$6A,$6A,$6E,$6A,$68,$6A,$68
+.byte $6E,$6A,$24,$68,$6A,$68,$6A,$6E
+.byte $6A,$6E,$71
 
-.byte $21,$06
-.byte $13
-.byte $68,$6A,$6A,$68,$6C,$68,$6D
-.byte $68,$6E,$6A,$24,$68,$6D,$68,$6D
-.byte $6E,$6A,$6F,$69
+.dbyt $2106
+.byte 19
+.byte $68,$6A,$6A,$68,$6C,$68,$6D,$68
+.byte $6E,$6A,$24,$68,$6D,$68,$6D,$6E
+.byte $6A,$6F,$69
 
-.byte $21,$26
-.byte $13
-.byte $68,$6A,$6A,$6E,$6A,$68,$6A,$68,$6E
-.byte $6A,$24,$68,$6A,$68,$6A,$6E,$6A
-.byte $72,$6A
+.dbyt $2126
+.byte 19
+.byte $68,$6A,$6A,$6E,$6A,$68,$6A,$68
+.byte $6E,$6A,$24,$68,$6A,$68,$6A,$6E
+.byte $6A,$72,$6A
 
-.byte $21,$43
-.byte $19
+.dbyt $2143
+.byte 25
 .byte $78,$24,$24,$68,$6A,$6A,$6E,$6A
 .byte $68,$6A,$68,$6F,$70,$24,$68,$70
-.byte $68,$6A,$6F,$70,$6F,$70,$73,$24,$88
+.byte $68,$6A,$6F,$70,$6F,$70,$73,$24
+.byte $88
 
 ;this is where strings are stored (1 PLAYER GAME A, 2 PLAYER GAME B, etc.)
 
 ;1 PLAYER GAME A
 OnePlayerGameAString:
-.byte $22,$09
+.dbyt $2209
 .byte @StringEnd-@StringStart
 @StringStart:
  .byte "1 PLAYER GAME A"
@@ -9530,7 +9523,7 @@ OnePlayerGameAString:
 
 ;1 PLAYER GAME B
 OnePlayerGameBString:
-.byte $22,$49
+.dbyt $2249
 .byte @StringEnd-@StringStart
 @StringStart:
  .byte "1 PLAYER GAME B"
@@ -9538,7 +9531,7 @@ OnePlayerGameBString:
 
 TwoPlayerGameAString:
 ;2 PLAYER GAME A
-.byte $22,$89
+.dbyt $2289
 .byte @StringEnd-@StringStart
 @StringStart:
  .byte "2 PLAYER GAME A"
@@ -9546,7 +9539,7 @@ TwoPlayerGameAString:
 
 TwoPlayerGameBString:
 ;2 PLAYER GAME B
-.byte $22,$C9
+.dbyt $22C9
 .byte @StringEnd-@StringStart
 @StringStart:
  .byte "2 PLAYER GAME B"
@@ -9554,7 +9547,7 @@ TwoPlayerGameBString:
 
 NintendoCOString:
 ;(c)1983 NINTENDO CO.,LTD.
-.byte $23,$05
+.dbyt $2305
 .byte @StringEnd-@StringStart
 @StringStart:
  .byte CopyrightSymbol,"1983 NINTENDO CO",DotAndComma,"LTD."
@@ -9562,74 +9555,67 @@ NintendoCOString:
 
 ;MADE IN JAPAN
 MadeInJapanString:
-.byte $23,$4B
+.dbyt $234B
 .byte @StringEnd-@StringStart
 @StringStart:
  .byte "MADE IN JAPAN"
 @StringEnd:
 
 ;finally, attributes to give our tiles some color
-.byte $23,$C8
-.byte $0F
-.byte $AA,$2A,$0A,$0A,$0A,$0A
-.byte $8A,$00,$FF,$30,$00,$00,$00,$00
-.byte $C0
+.dbyt $23C8
+.byte 15
+.byte $AA,$2A,$0A,$0A,$0A,$0A,$8A,$00
+.byte $FF,$30,$00,$00,$00,$00,$C0
 
-.byte $23,$D8
-.byte VRAMWriteCommand_Repeat|$08                           ;repeat 8 times same attribute
+.dbyt $23D8
+.byte VRAMWriteCommand_Repeat|8                             ;repeat 8 times same attribute
 .byte $FF
 
-.byte $23,$E0
-.byte VRAMWriteCommand_Repeat|$10
+.dbyt $23E0
+.byte VRAMWriteCommand_Repeat|16
 .byte $55
 
-.byte $23,$F0
-.byte VRAMWriteCommand_Repeat|$08
+.dbyt $23F0
+.byte VRAMWriteCommand_Repeat|8
 .byte $AA
 
 .byte VRAMWriteCommand_Stop                                 ;end writing (finally)
 
 ;initialize platforms. do note that the tiles themselves aren't provided as they are stored from the address in RAM.
-DATA_F1E7:
-.byte $21,$20
-.byte VRAMWriteCommand_Repeat|$0E
+PlatformLayoutData_F1E7:
+.dbyt $2120
+.byte VRAMWriteCommand_Repeat|14
 
-.byte $21,$32
-.byte VRAMWriteCommand_Repeat|$0E
+.dbyt $2132
+.byte VRAMWriteCommand_Repeat|14
 
-.byte $21,$E8
-.byte VRAMWriteCommand_Repeat|$10
+.dbyt $21E8
+.byte VRAMWriteCommand_Repeat|16
 
-.byte $22,$00
-.byte VRAMWriteCommand_Repeat|$04
+.dbyt $2200
+.byte VRAMWriteCommand_Repeat|4
 
-.byte $22,$1C
-.byte VRAMWriteCommand_Repeat|$04
+.dbyt $221C
+.byte VRAMWriteCommand_Repeat|4
 
-.byte $22,$A0
-.byte VRAMWriteCommand_Repeat|$0C
+.dbyt $22A0
+.byte VRAMWriteCommand_Repeat|12
 
-.byte $22,$B4
-.byte VRAMWriteCommand_Repeat|$0C
+.dbyt $22B4
+.byte VRAMWriteCommand_Repeat|12
 
 .byte VRAMWriteCommand_Stop
 
-;more data, bottom bricks?
-.byte $23,$60
-.byte VRAMWriteCommand_Repeat|$20
+;bottom floor (brick)
+.dbyt $2360
+.byte VRAMWriteCommand_Repeat|32
 
-.byte $23,$80
-.byte VRAMWriteCommand_Repeat|$20
+.dbyt $2380
+.byte VRAMWriteCommand_Repeat|32
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;DATA_F203 - Palette Data
-;This is where Palette data uploaded to VRAM is located.
-;It uses generic PPU write format, as other tables that use DrawStripeImage_CE00 (to be explained).
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-DATA_F203:
-.byte $3F,$00                                               ;PPU Address to write to
-.byte $20                                                   ;How many bytes to write (32 in dec)
+PaletteData_Gameplay_F203:
+.dbyt $3F00                                                 ;PPU Address to write to
+.byte 32                                                    ;How many bytes to write
 
 ;Gameplay Palette, used during, well, gameplay, including demo.
 .byte $0F,$30,$2C,$12                                       ;>Background 0, used by Phase 1's platforms, frozen platforms, POW and player's roman number tiles
@@ -9644,9 +9630,9 @@ DATA_F203:
 
 .byte VRAMWriteCommand_Stop                                 ;Command used to stop writing.
 
-DATA_F227:
-.byte $3F,$00                                               ;PPU Address
-.byte $14                                                   ;Write 20 bytes to PPU. That means no Sprite Palette 2-4 overwrite.
+PaletteData_TitleScreen_F227:
+.dbyt $3F00                                                 ;PPU Address
+.byte 20                                                    ;Write 20 bytes to PPU. That means no Sprite Palette 2-4 overwrite.
 
 ;Palette used for title screen.
 .byte $0F,$16,$16,$16                                       ;>Background 0, used by MARIO BROS. logo
@@ -9659,16 +9645,15 @@ DATA_F227:
 .byte VRAMWriteCommand_Stop                                 ;stop writing
 
 ;General attribute setup table
-;attributes that ar written for all phases. that being HUD and brick floor. just like before, uses generic PPU write format.
-
-DATA_F23F:
-.byte $23,$C0                                               ;PPU address
-.byte $10                                                   ;16 bytes
+;attributes that are stored for all phases, HUD and brick floor. just like before, uses generic PPU write format.
+GeneralPhaseAttributes_F23F:
+.dbyt $23C0                                                ;PPU address
+.byte 16
 .byte $00,$00,$C0,$30,$00,$50,$00,$00
 .byte $55,$55,$00,$00,$00,$00,$55,$55
 
-.byte $23,$F0                                               ;another PPU address, being at the bottom of the screen, aka brick flooring
-.byte $10                                                   ;16 bytes
+.dbyt $23F0                                                 ;another PPU address, being at the bottom of the screen, aka brick flooring
+.byte 16
 .byte $F5,$FF,$FF,$FF,$FF,$FF,$FF,$F5
 .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
 
@@ -9676,37 +9661,37 @@ DATA_F23F:
 
 
 ;attributes used for ledge tiles 93 and 97
-DATA_F266:
-.byte $23,$D0
-.byte VRAMWriteCommand_Repeat|$18                           ;repeat one byte $18 times
-.byte $00                                                   ;
+PlatformAttributes_Tiles93And97_F266:
+.dbyt $23D0
+.byte VRAMWriteCommand_Repeat|24
+.byte $00
 
-.byte $23,$E8
-.byte $08                                                   ;8 bytes
-.byte $50,$00,$00,$00,$00,$00,$00,$50                       ;
+.dbyt $23E8
+.byte 8
+.byte $50,$00,$00,$00,$00,$00,$00,$50
 
 .byte VRAMWriteCommand_Stop                                 ;end
 
 ;attributes used for ledge tiles 94 and 96
-DATA_F276:
-.byte $23,$D0
-.byte VRAMWriteCommand_Repeat|$18
+PlatformAttributes_Tiles94And96_F276:
+.dbyt $23D0
+.byte VRAMWriteCommand_Repeat|24
 .byte $AA
 
-.byte $23,$E8
-.byte $08
+.dbyt $23E8
+.byte 8
 .byte $5A,$AA,$AA,$00,$00,$AA,$AA,$5A
 
 .byte VRAMWriteCommand_Stop                                 ;stop write
 
 ;attributes used for ledge tile 95
-DATA_F286:
-.byte $23,$D0
-.byte VRAMWriteCommand_Repeat|$18
+PlatformAttributes_Tile95_F286:
+.dbyt $23D0
+.byte VRAMWriteCommand_Repeat|24
 .byte $FF
 
-.byte $23,$E8
-.byte $08
+.dbyt $23E8
+.byte 8
 .byte $5F,$FF,$FF,$00,$00,$FF,$FF,$5F
 
 .byte VRAMWriteCommand_Stop
@@ -9950,7 +9935,7 @@ SidestepperXMovementData:
 
 ;This set of data is enemy data to spawn from pipes per "Enemy level".
 ;First, there are pointers to appropriate tables.
-DATA_F3BA:
+EnemyFormationPointers_F3BA:
 .word DATA_F3D2
 .word DATA_F3D9
 .word DATA_F3E4
@@ -10376,85 +10361,82 @@ FireballMovementAnimCycle:
 TEMP_Def .set VRAMLoc_TopPipeLeft+2
 
 Layout_LevelPipes_F4F5:
-.byte >TEMP_Def,<TEMP_Def
-.byte $04
+.dbyt TEMP_Def
+.byte 4
 .byte $52,$51,$3C,$50
 
 TEMP_Def .set VRAMLoc_TopPipeLeft+$20
-.byte >TEMP_Def,<TEMP_Def
-.byte $06
+.dbyt TEMP_Def
+.byte 6
 .byte $41,$57,$56,$55,$47,$54
 
 TEMP_Def .set VRAMLoc_TopPipeLeft+$40
-.byte >TEMP_Def,<TEMP_Def
-.byte $06
+.dbyt TEMP_Def
+.byte 6
 .byte $46,$5C,$5B,$5A,$4C,$59
 
 TEMP_Def .set VRAMLoc_TopPipeLeft+$60
-.byte >TEMP_Def,<TEMP_Def
-.byte $04
+.dbyt TEMP_Def
+.byte 4
 .byte $49,$61,$49,$5F
 
 ;top-right pipe
 TEMP_Def .set VRAMLoc_TopPipeRight
-
-.byte >TEMP_Def,<TEMP_Def
-.byte $04
+.dbyt TEMP_Def
+.byte 4
 .byte $39,$3C,$3A,$3B
 
 TEMP_Def .set VRAMLoc_TopPipeRight+$20
-.byte >TEMP_Def,<TEMP_Def
-.byte $06
+.dbyt TEMP_Def
+.byte 6
 .byte $3D,$47,$3E,$3F,$40,$41
 
 TEMP_Def .set VRAMLoc_TopPipeRight+$40
-.byte >TEMP_Def,<TEMP_Def
-.byte $06
+.dbyt TEMP_Def
+.byte 6
 .byte $42,$4C,$43,$44,$45,$46
 
 TEMP_Def .set VRAMLoc_TopPipeRight+$62
-.byte >TEMP_Def,<TEMP_Def
-.byte $04
+.dbyt TEMP_Def
+.byte 4
 .byte $48,$49,$4A,$4B
 
 ;bottom-left pipe
-
 TEMP_Def .set VRAMLoc_BottomPipeLeft
-.byte >TEMP_Def,<TEMP_Def
-.byte $04
+.dbyt TEMP_Def
+.byte 4
 .byte $41,$41,$41,$57
 
 TEMP_Def .set VRAMLoc_BottomPipeLeft+$20
-.byte >TEMP_Def,<TEMP_Def
-.byte $04
+.dbyt TEMP_Def
+.byte 4
 .byte $46,$46,$46,$5C
 
 TEMP_Def .set VRAMLoc_BottomPipeLeft+$40
-.byte >TEMP_Def,<TEMP_Def
-.byte $04
+.dbyt TEMP_Def
+.byte 4
 .byte $4B,$4B,$4B,$61
 
 TEMP_Def .set VRAMLoc_BottomPipeRight
 ;bottom-right pipe
-.byte >TEMP_Def,<TEMP_Def
-.byte $04
+.dbyt TEMP_Def
+.byte 4
 .byte $40,$41,$41,$41
 
 TEMP_Def .set VRAMLoc_BottomPipeRight+$20
-.byte >TEMP_Def,<TEMP_Def
-.byte $04
+.dbyt TEMP_Def
+.byte 4
 .byte $45,$46,$46,$46
 
 TEMP_Def .set VRAMLoc_BottomPipeRight+$40
-.byte >TEMP_Def,<TEMP_Def
-.byte $04
+.dbyt TEMP_Def
+.byte 4
 .byte $4A,$4B,$4B,$4B
 .byte VRAMWriteCommand_Stop
 
-;POW Block update data
-;used for buffered write.
+;POW Block image data
 ;first byte is a number of rows and tiles in said rows (low nibble - amount of tiles, high nibble - rows)
-DATA_F560:
+POWTilemaps_F560:
 .byte $22
 .byte $24,$24
 .byte $24,$24                                               ;No POW block
@@ -10472,7 +10454,7 @@ DATA_F560:
 .byte $8C,$8D                                               ;full POW block
 
 ;VRAM locations for platform edges that can be bumped from below (so only 2x2 tiles instead of 3x2 are shown)
-DATA_F574:
+PlatformEdgeVRAMLocs_F574:
 .word $212D
 .word $21F7
 .word $2203
@@ -10712,20 +10694,20 @@ DATA_F64D:
 .byte $00,$FF,$AA
 
 ;this is used for HUD (player 1 and TOP prefixes)
-DATA_F660:
-.byte $20,$63
-.byte $01                                                   ;1 tile
+Layout_HUDGeneral_F660:
+.dbyt $2063
+.byte 1
 .byte $2A                                                   ;I- (first player score)
 
-.byte $20,$6B
-.byte $03
+.dbyt $206B
+.byte 3
 .byte $2B,$2C,$2D                                           ;TOP-
 .byte VRAMWriteCommand_Stop                                 ;stop
 
 ;this is also for HUD, for player 2, if applicable
-DATA_F66B:
-.byte $20,$75
-.byte $02
+Layout_HUDPlayerII_F66B:
+.dbyt $2075
+.byte 2
 .byte $29,$2A                                               ;II-
 .byte VRAMWriteCommand_Stop
 
@@ -10832,175 +10814,174 @@ FreezieDestructionAnimationData_F70F:
 .byte $00,$00,$00,$00,$00,$00,$EE
 
 ;some initial strings on phase load
-DATA_F722:
+GeneralPhaseStrings_F722:
 PhaseString:
-.byte $22,$4C
+.dbyt $224C
 .byte @StringEnd-@StringStart
 @StringStart:
  .byte "PHASE   "                                           ;PHASE    (last 2 spaces are replaced with appropriate digits depending on phase number)
 @StringEnd:
 
 PEqualsString:
-.byte $23,$41
+.dbyt $2341
 .byte @StringEnd-@StringStart
 @StringStart:
  .byte "P=  "                                               ;P=   (same as above, spaces replaced with phase number digits)
 @StringEnd:
 .byte VRAMWriteCommand_Stop
 
-;TEST YOUR SKILL string used when loading TEST YOUR SKILL! phase
-DATA_F735:
-.byte $21,$89
+;TEST YOUR SKILL string used when loading TEST YOUR SKILL phase
+TestYourSkillPhaseLayout_F735:
+.dbyt $2189
 .byte @StringEnd-@StringStart
 @StringStart:
  .byte "TEST YOUR SKILL"
 @StringEnd:
 
-;maybe make the rest follow the same "first size then tiles" convention
 ;then timer initialization
-.byte $20,$8D
-.byte $06
+.dbyt $208D
+.byte 6
 .byte $30,$31,$31,$31,$31,$32                               ;top border
 
-.byte $20,$AD
-.byte $06                                                   ;|20.0| (changes to 15.0 afterwads if in later TEST YOUR SKILL phases)
+.dbyt $20AD
+.byte 6                                                     ;|20.0| (changes to 15.0 afterwads if in later TEST YOUR SKILL phases)
 .byte $33,"20",DecimalSeparator,"0",$34
 
-.byte $20,$CD
-.byte $06
+.dbyt $20CD
+.byte 6
 .byte $35,$36,$36,$36,$36,$37                               ;bottom border
 .byte VRAMWriteCommand_Stop
 
 ;data for Freezie's platform freezing (replacing tiles, attributes)
 ;Middle platform
 DATA_F763:
-.byte $21,$EE
-.byte VRAMWriteCommand_Repeat|$04
+.dbyt $21EE
+.byte VRAMWriteCommand_Repeat|4
 .byte $97
 
-.byte $23,$DB
-.byte $02
+.dbyt $23DB
+.byte 2
 .byte $20,$80
 .byte VRAMWriteCommand_Stop
 
 DATA_F76D:
-.byte $21,$EC
-.byte VRAMWriteCommand_Repeat|$02
+.dbyt $21EC
+.byte VRAMWriteCommand_Repeat|2
 .byte $97
 
-.byte $21,$F2
-.byte VRAMWriteCommand_Repeat|$02
+.dbyt $21F2
+.byte VRAMWriteCommand_Repeat|2
 .byte $97
 
-.byte $23,$DB
-.byte $02
+.dbyt $23DB
+.byte 2
 .byte $00,$00
 .byte VRAMWriteCommand_Stop
 
 DATA_F77B:
-.byte $21,$EA
-.byte VRAMWriteCommand_Repeat|$02
+.dbyt $21EA
+.byte VRAMWriteCommand_Repeat|2
 .byte $97
 
-.byte $21,$F4
-.byte VRAMWriteCommand_Repeat|$02
+.dbyt $21F4
+.byte VRAMWriteCommand_Repeat|2
 .byte $97
 
-.byte $23,$DA
-.byte $04
+.dbyt $23DA
+.byte 4
 .byte $20,$00,$00,$80
 .byte VRAMWriteCommand_Stop
 
 DATA_F78B:
-.byte $21,$E8
-.byte VRAMWriteCommand_Repeat|$02
+.dbyt $21E8
+.byte VRAMWriteCommand_Repeat|2
 .byte $97
 
-.byte $21,$F6
-.byte VRAMWriteCommand_Repeat|$02
+.dbyt $21F6
+.byte VRAMWriteCommand_Repeat|2
 .byte $97
 
-.byte $23,$DA
-.byte $04
+.dbyt $23DA
+.byte 4
 .byte $00,$00,$00,$00
 .byte VRAMWriteCommand_Stop
 
 DATA_F79B:
-.byte $22,$A4
-.byte VRAMWriteCommand_Repeat|$04
+.dbyt $22A4
+.byte VRAMWriteCommand_Repeat|4
 .byte $97
 
-.byte $23,$E9
-.byte $01
+.dbyt $23E9
+.byte 1
 .byte $50
 
 .byte VRAMWriteCommand_Stop
 
 DATA_F7A4:
-.byte $22,$A2
-.byte VRAMWriteCommand_Repeat|$02
+.dbyt $22A2
+.byte VRAMWriteCommand_Repeat|2
 .byte $97
 
-.byte $22,$A8
-.byte VRAMWriteCommand_Repeat|$02
+.dbyt $22A8
+.byte VRAMWriteCommand_Repeat|2
 .byte $97
 
-.byte $23,$E8
-.byte $03
+.dbyt $23E8
+.byte 3
 .byte $52,$00,$08
 
 .byte VRAMWriteCommand_Stop
 
 DATA_F7B3:
-.byte $22,$A0
-.byte VRAMWriteCommand_Repeat|$02
+.dbyt $22A0
+.byte VRAMWriteCommand_Repeat|2
 .byte $97
 
-.byte $22,$AA
-.byte VRAMWriteCommand_Repeat|$02
+.dbyt $22AA
+.byte VRAMWriteCommand_Repeat|2
 .byte $97
 
-.byte $23,$E8
-.byte $03
+.dbyt $23E8
+.byte 3
 .byte $50,$00,$00
 .byte VRAMWriteCommand_Stop
 
 DATA_F7C2:
-.byte $22,$B8
-.byte VRAMWriteCommand_Repeat|$04
+.dbyt $22B8
+.byte VRAMWriteCommand_Repeat|4
 .byte $97
 
-.byte $23,$EE
-.byte $01
+.dbyt $23EE
+.byte 1
 .byte $50
 .byte VRAMWriteCommand_Stop
 
 DATA_F7CB:
-.byte $22,$B6
-.byte VRAMWriteCommand_Repeat|$02
+.dbyt $22B6
+.byte VRAMWriteCommand_Repeat|2
 .byte $97
 
-.byte $22,$BC
-.byte VRAMWriteCommand_Repeat|$02
+.dbyt $22BC
+.byte VRAMWriteCommand_Repeat|2
 .byte $97
 
-.byte $23,$ED
-.byte $03
+.dbyt $23ED
+.byte 3
 .byte $02,$00,$58
 
 .byte VRAMWriteCommand_Stop
 
 DATA_F7DA:
-.byte $22,$B4
-.byte VRAMWriteCommand_Repeat|$02
+.dbyt $22B4
+.byte VRAMWriteCommand_Repeat|2
 .byte $97
 
-.byte $22,$BE
-.byte VRAMWriteCommand_Repeat|$02
+.dbyt $22BE
+.byte VRAMWriteCommand_Repeat|2
 .byte $97
 
-.byte $23,$ED
-.byte $03
+.dbyt $23ED
+.byte 3
 .byte $00,$00,$50
 .byte VRAMWriteCommand_Stop
 

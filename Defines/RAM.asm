@@ -15,7 +15,7 @@ BaseCameraPosY = $0D                                        ;always remains 0, u
 ;$16-$17 - unused
 
 ;Controller addresses. Format: ABetUDLR, A = A button, B = B button, e = select, t = start, U = Up, D = Down, L = Left, R = Right.
-;Do note that InputPress only resets A and B bits after press.
+;Do note that InputPress only resets A bit after press, so it's not an entirely true presses address.
 
 ControllerInputHolding = $18                                ;base adress for both controllers (indexed)
 ControllerInputPress = $19                                  ;same as above but for presses
@@ -61,7 +61,7 @@ PlatformTileOffset = $32                                    ;this is used for pl
 ;$33 - Misc?
 EnemyLevel = $34                                            ;enemy level, used to load enemies depending on current phase. for more details see DATA_F3BA
 
-EntitySpawnIndex = $35                                      ;acts as an index for the pointer for enemies that come out of pipe. Also holds special command value, AA - no more enemies should spawn (except for freezies), BB - don't spawn entities at all (for TEST YOUR SKILL phases)
+EntitySpawnOffset = $35                                     ;acts as an offset for the pointer for enemies that come out of pipes. Also holds special command value, AA - no more enemies should spawn (except for freezies), BB - don't spawn entities at all (for TEST YOUR SKILL phases)
 EntitySpawnPointer = $36                                    ;2 bytes
 
 ;$38 - unused
@@ -437,7 +437,7 @@ WavyFireball_AppearForLuigiFlag = $04FB
 
 ReflectingFireball_SpawnTimer = $04FC                       ;2 bytes, there can be up to two reflecting fireballs (??? I'm pretty sure there can be only 1)
 ReflectingFireball_SpawnTimerIndex = $04FD
-ReflectingFireball_SpawnTimerIndexModifier = $04FE ;IN THEORY, this is supposed to change how long it takes reflecting fireball to respawn after it disappears in the same phase. in practice, it has no effect.
+ReflectingFireball_SpawnTimerIndexModifier = $04FE          ;IN THEORY, this is supposed to change how long it takes reflecting fireball to respawn after it disappears in the same phase. in practice, it has no effect.
 ReflectingFireball_Timer = $04FF                            ;how long the fireball should stay on screen
 
 RandomNumberStorage = $0500                                 ;4 bytes
