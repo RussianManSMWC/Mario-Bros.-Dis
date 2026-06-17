@@ -232,6 +232,8 @@ Cursor_XPos = $38
 Mario_OAM_Slot = 4
 Luigi_OAM_Slot = 10
 
+Entity_OAM_Start = 16                                       ;where entity OAM starts from during normal gameplay. note that the first 4 slots are actually unused, because the entity count is zero-non-inclusive (no entity can be in slot 0)
+
 ;players will take these slots during TEST YOUR SKILL bonus phases
 MarioInTestYourSkill_OAM_Slot = 0                           ;respective player starting OAM slots
 LuigiInTestYourSkill_OAM_Slot = 6

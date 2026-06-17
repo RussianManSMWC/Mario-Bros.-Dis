@@ -3087,23 +3087,23 @@ CODE_CF12:
    BNE CODE_CF12                                            ;
 
 CODE_CF19:
-   LDA $33                  
-   ASL A                 
-   ASL A
-   ASL A
-   ASL A
-   CLC                      
-   ADC #$40        
-   TAX
+   LDA $33                                                  ;calculate current entity's OAM slot
+   ASL A                                                    ;
+   ASL A                                                    ;
+   ASL A                                                    ;
+   ASL A                                                    ;times 16 (4 slots each)
+   CLC                                                      ;
+   ADC #Entity_OAM_Start*4                                  ;all other entity OAM starts from this slot
+   TAX                                                      ;
    
    LDY #$00
 
 CODE_CF25:   
    LDA ($14),Y
-   CPY #$0A    
+   CPY #CurrentEntity_OAMOffset-CurrentEntity_Address       ;check if we're about to store entity's OAM offset
    BNE CODE_CF2C
    
-   TXA
+   TXA                                                      ;store OAM slot
 
 CODE_CF2C:   
    STA ($A0),Y
@@ -3141,12 +3141,12 @@ CODE_CF53:
 
    LDX #$10                                                 ;x-position for left pipe
 
-CODE_CF5B:   
-   LDY #$12                                                 ;
-   STA ($A0),Y                                              ;direction, maybe?
+CODE_CF5B:
+   LDY #CurrentEntity_PipeDir-CurrentEntity_Address         ;
+   STA ($A0),Y                                              ;direction
    TXA                                                      ;
 
-   LDY #$09                                                 ;
+   LDY #CurrentEntity_XPos-CurrentEntity_Address            ;
    STA ($A0),Y                                              ;store x-pos
 
    INC $43                                                  ;+1 to the enemy count
@@ -9708,8 +9708,8 @@ DrawModeTileConfigurationPointers_F296:
 
 ;each entry is three bytes long:
 ;first byte - flicker handling. $80 - even frames, $01 - odd frames, $00 - tile won't flicker
-;second byte - tile x-disposition relative to entity
-;third byte - tile y-disposition relative to entity
+;second byte - tile y-disposition relative to entity
+;third byte - tile x-disposition relative to entity
 ;table ends with $AA
 
 DrawModeTileConfig_16x24_F2A6:
